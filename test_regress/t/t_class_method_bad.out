@@ -1,0 +1,6 @@
+%Error: t/t_class_method_bad.v:17: Class method 'meth3' not found in class 'Cls2'
+                                 : ... In instance t
+                                 : ... Suggested alternative: 'meth2'
+      c.meth3();   
+        ^~~~~
+%Error: Exiting due to

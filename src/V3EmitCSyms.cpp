@@ -100,6 +100,7 @@ class EmitCSyms : EmitCBaseVisitor {
     std::map<int,bool> m_usesVfinal;    // Split method uses __Vfinal
 
     // METHODS
+    void emitClassesFwdHdr();
     void emitSymHdr();
     void checkSplit(bool usesVfinal);
     void closeSplit();
@@ -260,6 +261,7 @@ class EmitCSyms : EmitCBaseVisitor {
         // Output
         if (!m_dpiHdrOnly) {
             // Must emit implementation first to determine number of splits
+            emitClassesFwdHdr();
             emitSymImp();
             emitSymHdr();
         }
@@ -360,6 +362,32 @@ public:
     }
 };
 
+void EmitCSyms::emitClassesFwdHdr() {
+    if (!v3Global.needClasses()) return;
+    UINFO(6, __FUNCTION__ << ": " << endl);
+    string filename = v3Global.opt.makeDir() + "/" + classesFilename() + "Fwd.h";
+    newCFile(filename, true /*slow*/, false /*source*/);
+    V3OutCFile hf(filename);
+    m_ofp = &hf;
+
+    ofp()->putsHeader();
+    puts("// DESCR" "IPTION: Verilator output: User-defined class forward definition header\n");
+    puts("//\n");
+    puts("// Internal details; calling programs do not need this, other headers include it.\n");
+    ofp()->putsGuard();
+
+    // Not included directly, so no verilated.h etc
+
+    puts("\n// USER CLASSES\n");
+    for (AstNode* nodep = v3Global.rootp()->miscsp(); nodep; nodep = nodep->nextp()) {
+        if (AstClass* classp = VN_CAST(nodep, Class)) {
+            puts("class " + classp->nameProtect() + ";\n");
+        }
+    }
+
+    ofp()->putsEndGuard();
+}
+
 void EmitCSyms::emitSymHdr() {
     UINFO(6,__FUNCTION__<<": "<<endl);
     string filename = v3Global.opt.makeDir()+"/"+symClassName()+".h";
@@ -382,8 +410,10 @@ void EmitCSyms::emitSymHdr() {
     } else {
         puts("#include \"verilated.h\"\n");
     }
+    if (v3Global.needClasses()) {
+        puts("#include \"" + classesFilename() + ".h\"\n");
+    }
 
-    // for
     puts("\n// INCLUDE MODULE CLASSES\n");
     for (AstNodeModule* nodep = v3Global.rootp()->modulesp();
          nodep; nodep=VN_CAST(nodep->nextp(), NodeModule)) {

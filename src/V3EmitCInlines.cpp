@@ -50,6 +50,11 @@ class EmitCInlines : EmitCBaseVisitor {
         v3Global.needHeavy(true);
         iterateChildren(nodep);
     }
+    virtual void visit(AstClass* nodep) {
+        v3Global.needClasses(true);
+        v3Global.needHeavy(true);
+        iterateChildren(nodep);
+    }
     virtual void visit(AstQueueDType* nodep) {
         v3Global.needHeavy(true);
         iterateChildren(nodep);
@@ -60,6 +65,10 @@ class EmitCInlines : EmitCBaseVisitor {
     }
     virtual void visit(AstValuePlusArgs* nodep) {
         v3Global.needHeavy(true);
+        iterateChildren(nodep);
+    }
+    virtual void visit(AstNew* nodep) {
+        if (v3Global.opt.savable()) v3error("Unsupported: --savable with dynamic new");
         iterateChildren(nodep);
     }
     virtual void visit(AstAtoN* nodep) {

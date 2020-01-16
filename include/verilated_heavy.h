@@ -32,6 +32,7 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <string>
 
 //===================================================================
@@ -342,6 +343,18 @@ template <class T_Value>
 std::string VL_TO_STRING(const VlQueue<T_Value>& obj) {
     return obj.to_string();
 }
+
+//===================================================================
+// Verilog class reference container
+// There are no multithreaded locks on this; the base variable must
+// be protected by other means
+//
+
+#if (__cplusplus < 201103L) && !defined(VL_THREADED_NO_C11_WARNING)
+# define VlClassRef VlClassRef__SystemVerilog_class_support_requires_a_C11_or_newer_compiler
+#else
+# define VlClassRef std::shared_ptr
+#endif
 
 //======================================================================
 // Conversion functions

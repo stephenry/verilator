@@ -246,8 +246,11 @@ public:
 };
 
 class AstClass : public AstNode {
+    // TYPES
+    typedef std::map<string, AstNode*> MemberNameMap;
     // MEMBERS
     string m_name;  // Name
+    MemberNameMap m_members;  // Members or method children
 public:
     AstClass(FileLine* fl, const string& name)
         : AstNode(fl)
@@ -257,8 +260,33 @@ public:
     virtual void name(const string& name) { m_name = name; }
     virtual string verilogKwd() const { return "class"; }
     virtual bool maybePointedTo() const { return true; }
+    virtual void dump(std::ostream& str) const;
     AstNode* membersp() const { return op1p(); }  // op1 = List of statements
     void addMembersp(AstNode* nodep) { addNOp1p(nodep); }
+    AstClassExtends* extendsp() const { return VN_CAST(op2p(), ClassExtends); }
+    void extendsp(AstNode* nodep) { addNOp2p(nodep); }
+    void clearCache() { m_members.clear(); }
+    void repairCache();
+    AstNode* findMember(const string& name) const {
+        MemberNameMap::const_iterator it = m_members.find(name);
+        return (it == m_members.end()) ? NULL : it->second;
+    }
+};
+
+class AstClassExtends : public AstNode {
+    // Children: AstClassRefDType during early parse, then moves to dtype
+public:
+    AstClassExtends(FileLine* fl, AstNodeDType* dtp)
+        : AstNode(fl) {
+        childDTypep(dtp);  // Only for parser
+    }
+    ASTNODE_NODE_FUNCS(ClassExtends)
+    virtual string verilogKwd() const { return "extends"; }
+    virtual bool hasDType() const { return true; }
+    AstNodeDType* getChildDTypep() const { return childDTypep(); }
+    AstNodeDType* childDTypep() const { return VN_CAST(op1p(), NodeDType); }  // op1 = Type assigning to
+    void childDTypep(AstNodeDType* nodep) { setOp1p(nodep); }
+    AstClass* classp() const;  // Class being extended (after link)
 };
 
 //######################################################################
@@ -724,6 +752,8 @@ public:
                 && m_packagep == asamep->m_packagep); }
     virtual bool similarDType(AstNodeDType* samep) const { return this == samep; }
     virtual V3Hash sameHash() const { return V3Hash(V3Hash(m_classp), V3Hash(m_packagep)); }
+    virtual void dump(std::ostream& str=std::cout) const;
+    virtual void dumpSmall(std::ostream& str) const;
     virtual string name() const { return classp() ? classp()->name() : "<unlinked>"; }
     virtual AstBasicDType* basicp() const { return NULL; }
     virtual AstNodeDType* skipRefp() const { return (AstNodeDType*)this; }
@@ -1339,31 +1369,43 @@ public:
     void declRange(const VNumRange& flag) { m_declRange = flag; }
 };
 
-class AstMethodCall : public AstNode {
+class AstMethodCall : public AstNodeStmt {
     // A reference to a member task (or function)
-    // We do not support generic member calls yet, so this is only enough to
-    // make built-in methods work
+    // PARENTS: stmt/math
+    // Not all calls are statments vs math.  AstNodeStmt needs isStatement() to deal.
 private:
+    // Don't need the class we are extracting from, as the "fromp()"'s datatype can get us to it
     string m_name;  // Name of method
+    AstNodeFTask* m_ftaskp;  // Link to the function
+    bool m_statement;  // Is a statement (AstNodeMath-like) versus AstNodeStmt-like
 public:
-    AstMethodCall(FileLine* fl, AstNode* fromp, VFlagChildDType, const string& name, AstNode* pinsp)
-        : AstNode(fl), m_name(name) {
+    AstMethodCall(FileLine* fl, AstNode* fromp, VFlagChildDType, const string& name,
+                  AstNode* pinsp)
+        : AstNodeStmt(fl), m_name(name), m_ftaskp(NULL), m_statement(false) {
         setOp1p(fromp);
         dtypep(NULL);  // V3Width will resolve
         addNOp2p(pinsp);
     }
     AstMethodCall(FileLine* fl, AstNode* fromp, const string& name, AstNode* pinsp)
-        : AstNode(fl), m_name(name) {
+        : AstNodeStmt(fl), m_name(name), m_ftaskp(NULL), m_statement(false) {
         setOp1p(fromp);
         addNOp2p(pinsp);
     }
     ASTNODE_NODE_FUNCS(MethodCall)
+    virtual void dump(std::ostream& str) const;
     virtual string name() const { return m_name; }  // * = Var name
     virtual void name(const string& name) { m_name = name; }
+    virtual bool hasDType() const { return true; }
+    virtual const char* broken() const { BROKEN_RTN(m_ftaskp && !m_ftaskp->brokeExists()); return NULL; }
+    virtual void cloneRelink() { if (m_ftaskp && m_ftaskp->clonep()) m_ftaskp = m_ftaskp->clonep(); }
+    virtual bool isStatement() const { return m_statement; }
+    void makeStatement() { m_statement = true; dtypeSetVoid(); }
     AstNode* fromp() const { return op1p(); }  // op1 = Extracting what (NULL=TBD during parsing)
     void fromp(AstNode* nodep) { setOp1p(nodep); }
     AstNode* pinsp() const { return op2p(); }  // op2 = Pin interconnection list
     void addPinsp(AstNode* nodep) { addOp2p(nodep); }
+    AstNodeFTask* ftaskp() const { return m_ftaskp; }  // [After Link] Pointer to variable
+    void ftaskp(AstNodeFTask* ftaskp) { m_ftaskp = ftaskp; }
 };
 
 class AstCMethodCall : public AstNodeStmt {
@@ -1429,6 +1471,7 @@ private:
     bool        m_usedClock:1;  // Signal used as a clock
     bool        m_usedParam:1;  // Parameter is referenced (on link; later signals not setup)
     bool        m_usedLoopIdx:1;  // Variable subject of for unrolling
+    bool        m_classMember:1;  // Member variable for a class
     bool        m_funcLocal:1;  // Local variable for a function
     bool        m_funcReturn:1;  // Return variable for a function
     bool        m_attrClockEn:1;// User clock enable attribute
@@ -1455,6 +1498,7 @@ private:
         m_usedClock = false; m_usedParam = false; m_usedLoopIdx = false;
         m_sigPublic = false; m_sigModPublic = false;
         m_sigUserRdPublic = false; m_sigUserRWPublic = false;
+        m_classMember = false;
         m_funcLocal = false; m_funcReturn = false;
         m_attrClockEn = false; m_attrScBv = false;
         m_attrIsolateAssign = false; m_attrSFormat = false;
@@ -1574,6 +1618,7 @@ public:
     void isConst(bool flag) { m_isConst = flag; }
     void isStatic(bool flag) { m_isStatic = flag; }
     void isIfaceParent(bool flag) { m_isIfaceParent = flag; }
+    void classMember(bool flag) { m_classMember = flag; }
     void funcLocal(bool flag) { m_funcLocal = flag; }
     void funcReturn(bool flag) { m_funcReturn = flag; }
     void isDpiOpenArray(bool flag) { m_isDpiOpenArray = flag; }
@@ -1628,6 +1673,7 @@ public:
     bool isTrace() const { return m_trace; }
     bool isConst() const { return m_isConst; }
     bool isStatic() const { return m_isStatic; }
+    bool isClassMember() const { return m_classMember; }
     bool isFuncLocal() const { return m_funcLocal; }
     bool isFuncReturn() const { return m_funcReturn; }
     bool isPullup() const { return m_isPullup; }

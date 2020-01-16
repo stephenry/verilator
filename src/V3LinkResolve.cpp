@@ -54,6 +54,7 @@ private:
     // STATE
     // Below state needs to be preserved between each module call.
     AstNodeModule* m_modp;  // Current module
+    AstClass* m_classp;  // Class we're inside
     AstNodeFTask* m_ftaskp;  // Function or task we're inside
     AstNodeCoverOrAssert* m_assertp;  // Current assertion
     int m_senitemCvtNum;  // Temporary signal counter
@@ -88,9 +89,17 @@ private:
         iterateChildren(nodep);
         m_assertp = NULL;
     }
-
+    virtual void visit(AstClass* nodep) {
+        AstClass* origClassp = m_classp;
+        {
+            m_classp = nodep;
+            iterateChildren(nodep);
+        }
+        m_classp = origClassp;
+    }
     virtual void visit(AstVar* nodep) {
         iterateChildren(nodep);
+        if (m_classp) nodep->classMember(true);
         if (m_ftaskp) nodep->funcLocal(true);
         if (nodep->isSigModPublic()) {
             nodep->sigModPublic(false);  // We're done with this attribute
@@ -109,6 +118,7 @@ private:
     virtual void visit(AstNodeFTask* nodep) {
         // NodeTask: Remember its name for later resolution
         // Remember the existing symbol table scope
+        if (m_classp) nodep->classMethod(true);
         m_ftaskp = nodep;
         iterateChildren(nodep);
         m_ftaskp = NULL;
@@ -460,6 +470,7 @@ private:
 public:
     // CONSTRUCTORS
     explicit LinkResolveVisitor(AstNetlist* rootp) {
+        m_classp = NULL;
         m_ftaskp = NULL;
         m_modp = NULL;
         m_assertp = NULL;

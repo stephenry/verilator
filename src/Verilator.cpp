@@ -30,6 +30,7 @@
 #include "V3Case.h"
 #include "V3Cast.h"
 #include "V3Changed.h"
+#include "V3Class.h"
 #include "V3Clean.h"
 #include "V3Clock.h"
 #include "V3Combine.h"
@@ -288,6 +289,9 @@ void process() {
         // Flatten hierarchy, creating a SCOPE for each module's usage as a cell
         V3Scope::scopeAll(v3Global.rootp());
         V3LinkDot::linkDotScope(v3Global.rootp());
+
+        // Relocate classes (after linkDot)
+        V3Class::classAll(v3Global.rootp());
     }
 
     //--SCOPE BASED OPTIMIZATIONS--------------
@@ -527,6 +531,7 @@ void process() {
         // emitcInlines is first, as it may set needHInlines which other emitters read
         V3EmitC::emitcInlines();
         V3EmitC::emitcSyms();
+        V3EmitC::emitcClasses();
         V3EmitC::emitcTrace();
     } else if (v3Global.opt.dpiHdrOnly()) {
         V3EmitC::emitcSyms(true);

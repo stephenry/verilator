@@ -714,6 +714,11 @@ public:
             iterateAndNextNull(nodep->expr2p()); puts(")");
         }
     }
+    virtual void visit(AstMemberSel* nodep) {
+        iterateAndNextNull(nodep->fromp());
+        putbs("->");
+        puts(nodep->varp()->nameProtect());
+    }
     virtual void visit(AstNew* nodep) {
         puts("std::make_shared<" + nodep->dtypep()->nameProtect() + ">(");
         iterateChildren(nodep);
@@ -1361,6 +1366,9 @@ class EmitCImp : EmitCStmts {
             string cvtarray = (adtypep->subDTypep()->isWide() ? ".data()" : "");  // Access std::array as C array
             return emitVarResetRecurse(varp, adtypep->subDTypep(), depth+1,
                                        ".atDefault()" + cvtarray);
+        }
+        else if (AstClassRefDType* adtypep = VN_CAST(dtypep, ClassRefDType)) {
+            return "";  // Constructor does it
         }
         else if (AstQueueDType* adtypep = VN_CAST(dtypep, QueueDType)) {
             return emitVarResetRecurse(varp, adtypep->subDTypep(), depth+1, ".atDefault()");
@@ -2562,6 +2570,9 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
     if (v3Global.needHInlines()) {  // Set by V3EmitCInlines; should have been called before us
         puts("#include \""+topClassName()+"__Inlines.h\"\n");
     }
+    if (v3Global.needClasses()) {
+        puts("#include \"" + classesFilename() + "Fwd.h\"\n");
+    }
     if (v3Global.dpi()) {
         // do this before including our main .h file so that any references to
         // types defined in svdpi.h are available
@@ -2767,6 +2778,9 @@ void EmitCImp::emitImp(AstNodeModule* modp) {
     puts("\n");
     puts("#include \""+modClassName(modp)+".h\"\n");
     puts("#include \""+symClassName()+".h\"\n");
+    if (v3Global.needClasses()) {
+        puts("#include \"" + classesFilename() + ".h\"\n");
+    }
 
     if (v3Global.dpi()) {
         puts("\n");
@@ -2867,6 +2881,113 @@ void EmitCImp::main(AstNodeModule* modp, bool slow, bool fast) {
     }
     delete m_ofp; m_ofp = NULL;
 }
+
+//######################################################################
+// Classes interface
+
+class EmitCClassesInt : EmitCStmts {
+    virtual void visit(AstClass* nodep) {
+        ofp()->resetPrivate();
+        puts("\n");
+        puts("class " + nodep->nameProtect());
+        if (nodep->extendsp()) puts(" : public " + nodep->extendsp()->classp()->nameProtect());
+        puts(" {\n");
+        ofp()->putsPrivate(false);
+        if (nodep->membersp()) {
+            puts("// MEMBERS\n");
+            emitVarList(nodep->membersp(), EVL_FUNC_ALL, "");
+        }
+        ofp()->putsPrivate(false);
+        puts(  "// METHODS\n");
+        puts(  "std::string to_string() const;\n");
+        puts(  "std::string to_string_middle() const;\n");
+        puts("};\n");
+        puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj);\n");
+    }
+public:
+    explicit EmitCClassesInt() {}
+    virtual ~EmitCClassesInt() {}
+    void main() {
+        // Put out the file
+        m_ofp = new V3OutCFile(v3Global.opt.makeDir() + "/" + classesFilename() + ".h");
+        m_ofp->putsHeader();
+        m_ofp->puts("// DESCR"
+                    "IPTION: Verilator output: User class interface header\n");
+        ofp()->putsGuard();
+
+        puts("\n");
+        puts("#include \"" + symClassName() + ".h\"\n");
+
+        for (AstNode* nodep = v3Global.rootp()->miscsp(); nodep; nodep = nodep->nextp()) {
+            if (AstClass* classp = VN_CAST(nodep, Class)) iterate(classp);
+        }
+
+        ofp()->putsEndGuard();
+    }
+};
+
+//######################################################################
+// Classes implementation
+
+class EmitCClassesImp : EmitCStmts {
+    //  AstNode::user1()        -> bool.  Class (or extended class) has members
+    AstUser1InUse m_inuser1;
+
+    virtual void visit(AstClass* nodep) {
+        puts("\n");
+        puts("// class " + nodep->nameProtect() + "\n");
+        puts("std::string " + nodep->nameProtect() + "::to_string() const {\n");
+        puts(  "return std::string(\"`{\") + to_string_middle() + \"}\";\n");
+        puts("}\n");
+        puts("std::string " + nodep->nameProtect() + "::to_string_middle() const {\n");
+        puts(  "std::string out;\n");
+        std::string comma;
+        for (AstNode* itemp = nodep->membersp(); itemp; itemp = itemp->nextp()) {
+            if (VN_IS(itemp, Var)) {
+                puts("out += \"");
+                puts(comma);
+                puts(itemp->origNameProtect());
+                puts(":\" + VL_TO_STRING(");
+                puts(itemp->nameProtect());
+                puts(");\n");
+                comma = ", ";
+                nodep->user1(true);  // So what we extend dumps this
+            }
+        }
+        if (nodep->extendsp() && nodep->extendsp()->classp()->user1()) {
+            puts("out += ");
+            if (!comma.empty()) puts("\", \"+ ");
+            comma = ", ";
+            puts(nodep->extendsp()->dtypep()->nameProtect());
+            puts("::to_string_middle();\n");
+            nodep->user1(true);  // So what we extend dumps this
+        }
+        puts(  "return out;\n");
+        puts("}\n");
+        puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj) {\n");
+        puts(  "return (obj ? obj->to_string() : \"null\");\n");
+        puts("}\n");
+    }
+public:
+    explicit EmitCClassesImp() {}
+    virtual ~EmitCClassesImp() {}
+    void main() {
+        // Put out the file
+        string filename = classesFilename() + ".cpp";
+        newCFile(filename, false/*slow*/, true/*source*/);
+        m_ofp = new V3OutCFile(v3Global.opt.makeDir() + "/" + filename);
+        m_ofp->putsHeader();
+        m_ofp->puts("// DESCR"
+                    "IPTION: Verilator output: User class implementation header\n");
+
+        puts("\n");
+        puts("#include \"" + classesFilename() + ".h\"\n");
+
+        for (AstNode* nodep = v3Global.rootp()->miscsp(); nodep; nodep = nodep->nextp()) {
+            if (AstClass* classp = VN_CAST(nodep, Class)) iterate(classp);
+        }
+    }
+};
 
 //######################################################################
 // Tracing routines
@@ -3292,6 +3413,12 @@ void V3EmitC::emitc() {
             { EmitCImp both; both.main(nodep, true, true); }
         }
     }
+}
+
+void V3EmitC::emitcClasses() {
+    if (!v3Global.needClasses()) return;
+    { EmitCClassesInt c; c.main(); }
+    { EmitCClassesImp c; c.main(); }
 }
 
 void V3EmitC::emitcTrace() {

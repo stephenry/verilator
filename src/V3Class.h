@@ -1,6 +1,6 @@
 // -*- mode: C++; c-file-style: "cc-mode" -*-
 //*************************************************************************
-// DESCRIPTION: Verilator: Emit C++ code for module tree
+// DESCRIPTION: Verilator: Pre C-Emit stage changes
 //
 // Code available from: https://verilator.org
 //
@@ -18,8 +18,8 @@
 //
 //*************************************************************************
 
-#ifndef _V3EMITC_H_
-#define _V3EMITC_H_ 1
+#ifndef _V3CLASS_H_
+#define _V3CLASS_H_ 1
 
 #include "config_build.h"
 #include "verilatedos.h"
@@ -29,14 +29,9 @@
 
 //============================================================================
 
-class V3EmitC {
+class V3Class {
 public:
-    static void emitc();
-    static void emitcClasses();
-    static void emitcInlines();
-    static void emitcSyms(bool dpiHdrOnly = false);
-    static void emitcTrace();
-    static void emitcFiles();
+    static void classAll(AstNetlist* nodep);
 };
 
 #endif  // Guard

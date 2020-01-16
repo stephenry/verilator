@@ -1723,6 +1723,18 @@ private:
         nodep->widthForce(width, width);  // Signing stays as-is, as parsed from declaration
         //if (debug()>=9) nodep->dumpTree("-class-out-");
     }
+    virtual void visit(AstClass* nodep) {
+        if (nodep->didWidthAndSet()) return;
+        userIterateChildren(nodep, NULL);  // First size all members
+        nodep->repairCache();
+    }
+    virtual void visit(AstClassExtends* nodep) {
+        if (nodep->didWidthAndSet()) return;
+        if (nodep->childDTypep()) {
+            nodep->dtypep(moveChildDTypeEdit(nodep));  // data_type '{ pattern }
+        }
+        userIterateChildren(nodep, NULL);
+    }
     virtual void visit(AstMemberDType* nodep) {
         if (nodep->didWidthAndSet()) return;  // This node is a dtype & not both PRELIMed+FINALed
         if (nodep->childDTypep()) nodep->refDTypep(moveChildDTypeEdit(nodep));
@@ -1742,6 +1754,8 @@ private:
         UINFO(9,"     from dt "<<fromDtp<<endl);
         if (AstNodeUOrStructDType* adtypep = VN_CAST(fromDtp, NodeUOrStructDType)) {
             if (memberSelStruct(nodep, adtypep)) return;
+        } else if (AstClassRefDType* adtypep = VN_CAST(fromDtp, ClassRefDType)) {
+            if (memberSelClass(nodep, adtypep)) return;
         } else if (VN_IS(fromDtp, EnumDType)
                    || VN_IS(fromDtp, AssocArrayDType)
                    || VN_IS(fromDtp, QueueDType)
@@ -1762,6 +1776,34 @@ private:
         // Error handling
         nodep->replaceWith(new AstConst(nodep->fileline(), AstConst::LogicFalse()));
         pushDeletep(nodep); VL_DANGLING(nodep);
+    }
+    bool memberSelClass(AstMemberSel* nodep, AstClassRefDType* adtypep) {
+        // Returns true if ok
+        // No need to width-resolve the class, as it was done when we did the child
+        AstClass* first_classp = adtypep->classp();
+        UASSERT_OBJ(first_classp, nodep, "Unlinked");
+        for (AstClass* classp = first_classp; classp;) {
+            if (AstNode* memberp = classp->findMember(nodep->name())) {
+                nodep->dtypep(memberp->dtypep());
+                AstVar* varp = VN_CAST(memberp, Var);
+                UASSERT_OBJ(varp, nodep, "MemberSel of non-variable");
+                nodep->varp(varp);
+                return true;
+            }
+            classp = classp->extendsp() ? classp->extendsp()->classp() : NULL;
+        }
+        VSpellCheck speller;
+        for (AstClass* classp = first_classp; classp;) {
+            for (AstNode* itemp = classp->membersp(); itemp; itemp = itemp->nextp()) {
+                if (VN_IS(itemp, Var)) speller.pushCandidate(itemp->prettyName());
+            }
+            classp = classp->extendsp() ? classp->extendsp()->classp() : NULL;
+        }
+        string suggest = speller.bestCandidateMsg(nodep->prettyName());
+        nodep->v3error("Member "<<nodep->prettyNameQ()<<" not found in class "
+                       <<first_classp->prettyNameQ()<<"\n"
+                       <<(suggest.empty() ? "" : nodep->fileline()->warnMore()+suggest));
+        return false;  // Caller handles error
     }
     bool memberSelStruct(AstMemberSel* nodep, AstNodeUOrStructDType* adtypep) {
         // Returns true if ok
@@ -1817,6 +1859,9 @@ private:
         }
         else if (AstQueueDType* adtypep = VN_CAST(fromDtp, QueueDType)) {
             methodCallQueue(nodep, adtypep);
+        }
+        else if (AstClassRefDType* adtypep = VN_CAST(fromDtp, ClassRefDType)) {
+            methodCallClass(nodep, adtypep);
         }
         else if (AstUnpackArrayDType* adtypep = VN_CAST(fromDtp, UnpackArrayDType)) {
             methodCallUnpack(nodep, adtypep);
@@ -2119,6 +2164,43 @@ private:
         iterateCheckSigned32(nodep, "index", index_exprp, BOTH);
         VL_DANGLING(index_exprp);  // May have been edited
         return VN_CAST(nodep->pinsp(), Arg)->exprp();
+    }
+    void methodCallClass(AstMethodCall* nodep, AstClassRefDType* adtypep) {
+        // No need to width-resolve the class, as it was done when we did the child
+        AstClass* first_classp = adtypep->classp();
+        UASSERT_OBJ(first_classp, nodep, "Unlinked");
+        AstMethodCall* newp = NULL;
+        for (AstClass* classp = first_classp; classp;) {
+            if (AstNodeFTask* ftaskp = VN_CAST(classp->findMember(nodep->name()), NodeFTask)) {
+                nodep->ftaskp(ftaskp);
+                nodep->dtypeFrom(ftaskp);
+                ftaskp->dumpTree(cout, "FIXMEfound: ");
+                if (VN_IS(ftaskp, Task)) nodep->makeStatement();
+                return;
+            }
+            classp = classp->extendsp() ? classp->extendsp()->classp() : NULL;
+        }
+        //FIXME newp always NULL
+        if (!newp) {
+            VSpellCheck speller;
+            for (AstClass* classp = first_classp; classp;) {
+                for (AstNode* itemp = classp->membersp(); itemp; itemp = itemp->nextp()) {
+                    if (VN_IS(itemp, NodeFTask)) speller.pushCandidate(itemp->prettyName());
+                }
+                classp = classp->extendsp() ? classp->extendsp()->classp() : NULL;
+            }
+            string suggest = speller.bestCandidateMsg(nodep->prettyName());
+            nodep->v3error("Class method "
+                           << nodep->prettyNameQ() << " not found in class "
+                           << first_classp->prettyNameQ() << "\n"
+                           << (suggest.empty() ? "" : nodep->fileline()->warnMore() + suggest));
+        }
+        if (newp) {
+            newp->didWidth(true);
+            nodep->replaceWith(newp); nodep->deleteTree(); VL_DANGLING(nodep);
+        } else {
+            nodep->dtypeSetSigned32();  // Guess on error
+        }
     }
     void methodCallUnpack(AstMethodCall* nodep, AstUnpackArrayDType* adtypep) {
         enum { UNKNOWN = 0, ARRAY_OR, ARRAY_AND, ARRAY_XOR } methodId;
@@ -2732,13 +2814,16 @@ private:
                         added = true;
                         newFormat += "%g";
                     } else if (VN_IS(dtypep, AssocArrayDType)
+                               || VN_IS(dtypep, ClassRefDType)
                                || VN_IS(dtypep, QueueDType)) {
                         added = true;
                         newFormat += "%@";
                         AstNRelinker handle;
                         argp->unlinkFrBack(&handle);
-                        AstCMethodCall* newp = new AstCMethodCall(
-                            nodep->fileline(), argp, "to_string", NULL);
+                        AstCMath* newp = new AstCMath(
+                            nodep->fileline(), "VL_TO_STRING(", 0, true);
+                        newp->addBodysp(argp);
+                        newp->addBodysp(new AstText(nodep->fileline(), ")"));
                         newp->dtypeSetString();
                         newp->pure(true);
                         newp->protect(false);

@@ -329,6 +329,10 @@ public:
         if (forScopeCreation()) m_nameScopeSymMap.insert(make_pair(scopename, symp));
         return symp;
     }
+    void FIXMEins(VSymEnt* symp, const string& scopename) {
+        if (forScopeCreation()) m_nameScopeSymMap.insert(make_pair(scopename, symp));
+    }
+
     VSymEnt* insertInline(VSymEnt* abovep, VSymEnt* modSymp,
                           AstCellInline* nodep, const string& basename) {
         // A fake point in the hierarchy, corresponding to an inlined module
@@ -351,7 +355,7 @@ public:
         return symp;
     }
     VSymEnt* insertBlock(VSymEnt* abovep, const string& name,
-                         AstNode* nodep, AstPackage* packagep) {
+                         AstNode* nodep, AstPackage* packagep, bool FIXMEclass = false) {
         // A fake point in the hierarchy, corresponding to a begin or function/task block
         // After we remove begins these will go away
         // Note we fallback to the symbol table of the parent, as we want to find variables there
@@ -400,7 +404,7 @@ public:
     VSymEnt* getScopeSym(AstScope* nodep) {
         NameScopeSymMap::iterator it = m_nameScopeSymMap.find(nodep->name());
         UASSERT_OBJ(it != m_nameScopeSymMap.end(), nodep,
-                    "Scope never assigned a symbol entry?");
+                    "Scope never assigned a symbol entry '" << nodep->name() << "'");
         return it->second;
     }
     void implicitOkAdd(AstNodeModule* nodep, const string& varname) {
@@ -821,6 +825,46 @@ class LinkDotFindVisitor : public AstNVisitor {
         // Prep for next
         m_packagep = NULL;
     }
+    virtual void visit(AstClass* nodep) {
+        UASSERT_OBJ(m_curSymp, nodep, "Class not under module/package/$unit");
+/* FIXME OLD:
+        iterateChildren(nodep);
+        m_statep->insertSym(m_curSymp, nodep->name(), nodep, m_packagep);
+*/
+        UINFO(8,"   "<<nodep<<endl);
+        string oldscope = m_scope;
+        VSymEnt* oldModSymp = m_modSymp;
+        VSymEnt* oldCurSymp = m_curSymp;
+        int      oldParamNum    = m_paramNum;
+        int      oldBeginNum    = m_beginNum;
+        int      oldModBeginNum = m_modBeginNum;
+        {
+            UINFO(4,"     Link Class: "<<nodep<<endl);
+            VSymEnt* upperSymp = m_curSymp;
+            m_scope = m_scope + "." + nodep->name();
+            m_curSymp = m_modSymp
+                = m_statep->insertBlock(upperSymp, nodep->name(), nodep, m_packagep);
+            // FIXME hack because insertBlock doesn't do this and a class does need to track the
+            // symtable underneath.  Perhaps the various insertBlock functions can be made more
+            // similar?
+            m_statep->FIXMEins(m_curSymp, m_scope);
+            UINFO(9, "New module scope "<<m_curSymp<<endl);
+            //
+            m_paramNum = 0;
+            m_beginNum = 0;
+            m_modBeginNum = 0;
+            // m_modSymp/m_curSymp for non-packages set by AstCell above this module
+            // Iterate
+            iterateChildren(nodep);
+            nodep->user4(true);
+        }
+        m_scope = oldscope;
+        m_modSymp = oldModSymp;
+        m_curSymp = oldCurSymp;
+        m_paramNum    = oldParamNum;
+        m_beginNum    = oldBeginNum;
+        m_modBeginNum = oldModBeginNum;
+    }
     virtual void visit(AstScope* nodep) {
         UASSERT_OBJ(m_statep->forScopeCreation(), nodep,
                     "Scopes should only exist right after V3Scope");
@@ -1098,13 +1142,12 @@ class LinkDotFindVisitor : public AstNVisitor {
         }
     }
     virtual void visit(AstTypedef* nodep) {
-        // Remember its name for later resolution
-        UASSERT_OBJ(m_curSymp, nodep, "Typedef not under module?");
+        UASSERT_OBJ(m_curSymp, nodep, "Typedef not under module/package/$unit");
         iterateChildren(nodep);
         m_statep->insertSym(m_curSymp, nodep->name(), nodep, m_packagep);
     }
     virtual void visit(AstParamTypeDType* nodep) {
-        UASSERT_OBJ(m_curSymp, nodep, "Parameter type not under module?");
+        UASSERT_OBJ(m_curSymp, nodep, "Parameter type not under module/package/$unit");
         iterateChildren(nodep);
         m_statep->insertSym(m_curSymp, nodep->name(), nodep, m_packagep);
     }
@@ -1401,7 +1444,7 @@ class LinkDotScopeVisitor : public AstNVisitor {
         m_scopep = NULL;
     }
     virtual void visit(AstVarScope* nodep) {
-        if (!nodep->varp()->isFuncLocal()) {
+        if (!nodep->varp()->isFuncLocal() && !nodep->varp()->isClassMember()) {
             VSymEnt* varSymp = m_statep->insertSym(m_modSymp, nodep->varp()->name(), nodep, NULL);
             if (nodep->varp()->isIfaceRef()
                 && nodep->varp()->isIfaceParent()) {
@@ -2474,6 +2517,24 @@ private:
         m_ds.m_dotSymp = m_curSymp = oldCurSymp;
         m_ftaskp = NULL;
     }
+    virtual void visit(AstClass* nodep) {
+        UINFO(5,"   "<<nodep<<endl);
+        checkNoDot(nodep);
+        iterateChildren(nodep);
+        for (AstNode* itemp = nodep->membersp(); itemp; itemp = itemp->nextp()) {
+            if (AstClassExtends* eitemp = VN_CAST(itemp, ClassExtends)) {
+                // Replace abstract reference with hard pointer
+                // Will need later resolution when deal with parameters
+                //FIXME keep the reference.
+                /*
+                  AstClassRefDType* refp = VN_CAST(itemp->refp(), AstClassRefDType);
+                  UASSERT_OBJ(refp, itemp, "Class extension's class mssing reference.");
+                  nodep->extendsp(refp->
+                 */
+                //eitemp->unlinkFrBack()->deleteTree(); VL_DANGLING(itemp);
+            }
+        }
+    }
     virtual void visit(AstRefDType* nodep) {
         // Resolve its reference
         if (nodep->user3SetOnce()) return;
@@ -2504,7 +2565,16 @@ private:
                 nodep->refDTypep(defp);
                 nodep->packagep(foundp->packagep());
             }
+            else if (AstClass* defp = foundp ? VN_CAST(foundp->nodep(), Class)
+                     : NULL) {
+                AstClassRefDType* newp = new AstClassRefDType(nodep->fileline(), defp);
+                newp->packagep(foundp->packagep());
+                nodep->replaceWith(newp);
+                nodep->deleteTree(); VL_DANGLING(nodep);
+                return;
+            }
             else {
+                if (foundp) UINFO(1, "Found sym node: "<<foundp->nodep()<<endl);
                 nodep->v3error("Can't find typedef: "<<nodep->prettyNameQ());
             }
         }

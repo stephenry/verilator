@@ -5323,7 +5323,9 @@ class_declaration<nodep>:	// ==IEEE: part of class_declaration
 		classFront parameter_port_listE classExtendsE classImplementsE ';'
 			class_itemListE yENDCLASS endLabelE
 			{ $$ = $1; $1->addMembersp($2);
-			  $1->addMembersp($4); $1->addMembersp($6);
+			  $1->extendsp($3);
+			  $1->addMembersp($4);
+			  $1->addMembersp($6);
 			  SYMP->popScope($$);
 			  GRAMMARP->endLabel($<fl>7, $1, $8); }
 	;
@@ -5331,8 +5333,7 @@ class_declaration<nodep>:	// ==IEEE: part of class_declaration
 classFront<classp>:		// IEEE: part of class_declaration
 		classVirtualE yCLASS lifetimeE idAny/*class_identifier*/
 			{ $$ = new AstClass($2, *$4);
-			  SYMP->pushNew($<classp>$);
-			  BBUNSUP($2, "Unsupported: classes");  }
+			  SYMP->pushNew($<classp>$); }
 	//			// IEEE: part of interface_class_declaration
 	|	yINTERFACE yCLASS lifetimeE idAny/*class_identifier*/
 			{ $$ = new AstClass($2, *$4);
@@ -5361,10 +5362,11 @@ classExtendsList<nodep>:	// IEEE: part of class_declaration
 
 classExtendsOne<nodep>:		// IEEE: part of class_declaration
 		class_typeWithoutId
-			{ $$ = NULL; BBUNSUP($1, "Unsupported: extends"); }
+			{ $$ = new AstClassExtends($1->fileline(), $1); }
 	//			// IEEE: Might not be legal to have more than one set of parameters in an extends
 	|	class_typeWithoutId '(' list_of_argumentsE ')'
-			{ $$ = NULL; BBUNSUP($1, "Unsupported: extends"); }
+			{ $$ = new AstClassExtends($1->fileline(), $1);
+			  if ($3) BBUNSUP($3, "Unsupported: extends with parameters"); }
 	;
 
 classImplementsE<nodep>:	// IEEE: part of class_declaration
@@ -5388,7 +5390,7 @@ ps_id_etc:		// package_scope + general id
 		package_scopeIdFollowsE id		{ }
 	;
 
-ps_type<dtypep>:		// IEEE: ps_parameter_identifier | ps_type_identifier
+ps_type<refdtypep>:		// IEEE: ps_parameter_identifier | ps_type_identifier
 				// Even though we looked up the type and have a AstNode* to it,
 				// we can't fully resolve it because it may have been just a forward definition.
 		package_scopeIdFollowsE idRefDType	{ $$ = $2; $2->packagep($1); }
@@ -5397,7 +5399,7 @@ ps_type<dtypep>:		// IEEE: ps_parameter_identifier | ps_type_identifier
 
 //=== Below rules assume special scoping per above
 
-class_typeWithoutId<nodep>:	// as with class_typeWithoutId but allow yaID__aTYPE
+class_typeWithoutId<refdtypep>:	// as with class_typeWithoutId but allow yaID__aTYPE
 	//			// and we thus don't need to resolve it in specified package
 		package_scopeIdFollowsE class_typeOneList	{ $$ = $2; $2->packagep($1); }
 	;

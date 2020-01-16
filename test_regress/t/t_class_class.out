@@ -1,0 +1,4 @@
+%Error: t/t_class_class.v:11: Unsupported: class within class
+   class SubCls;
+   ^~~~~
+%Error: Exiting due to

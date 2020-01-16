@@ -1,0 +1,29 @@
+//FIXME not for master: TODO items related to class support
+
+What works:
+* Simple static member variables (test_regress/t/t_class1.v)
+* Base C generation for "extends".
+
+Next steps:
+* Member functions -- into V3Task then problems .
+* Once member functions work plan on merging to master.
+
+Once in master, file a bug on adding these that others can probably help:
+* _Class .cpp output needs to honor --split
+* Enable V3Task function inlining
+* Warn on unused class
+* Warn on unused members
+* Warn on unused methods
+* Create test cases for each major set of class features.
+  -- See github sv_tests as a starting point, though note these need work to be good self-checking
+     tests tests
+
+----------
+Imp TODO notes:
+
+Methods need as arguments:
+   Need "this" -- unless static
+   Need to be able to get to global/statics, so presumably need a pointer back to vlSym's.
+
+   Do statics get $display("%p")-ed?  Presumably.  Ick, means Vimp needed
+   in all display call hierarchy

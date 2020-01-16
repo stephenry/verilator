@@ -290,6 +290,10 @@ AstVar::VlArgTypeRecursed AstVar::vlArgTypeRecurse(bool forFunc, const AstNodeDT
         out += "> ";
         info.m_oprefix = out;
         return info;
+    } else if (const AstClassRefDType* adtypep = VN_CAST_CONST(dtypep, ClassRefDType)) {
+        VlArgTypeRecursed info;
+        info.m_oprefix = "VlClassRef<" + adtypep->nameProtect() + ">";
+        return info;
     } else if (const AstUnpackArrayDType* adtypep = VN_CAST_CONST(dtypep, UnpackArrayDType)) {
         VlArgTypeRecursed info = vlArgTypeRecurse(forFunc, adtypep->subDTypep(), arrayed);
         info.m_osuffix = "[" + cvtToStr(adtypep->declRange().elements()) + "]" + info.m_osuffix;
@@ -957,6 +961,35 @@ void AstCellInline::dump(std::ostream& str) const {
     this->AstNode::dump(str);
     str<<" -> "<<origModName();
 }
+void AstClass::repairCache() {
+    clearCache();
+    for (AstNode* itemp = membersp(); itemp; itemp = itemp->nextp()) {
+        if (VN_IS(itemp, Var) || VN_IS(itemp, NodeFTask)) {
+            if (m_members.find(itemp->name()) != m_members.end()) {
+                itemp->v3error("Duplicate declaration of member name: " << itemp->prettyNameQ());
+            } else {
+                m_members.insert(make_pair(itemp->name(), itemp));
+            }
+        }
+    }
+}
+void AstClass::dump(std::ostream& str) const {
+    this->AstNode::dump(str);
+}
+AstClass* AstClassExtends::classp() const {
+    AstClassRefDType* refp = VN_CAST(dtypep(), ClassRefDType);
+    UASSERT_OBJ(refp, this, "class extends non-ref");
+    return refp->classp();
+}
+void AstClassRefDType::dump(std::ostream& str) const {
+    this->AstNode::dump(str);
+    if (classp()) { str<<" -> "; classp()->dump(str); }
+    else { str<<" -> UNLINKED"; }
+}
+void AstClassRefDType::dumpSmall(std::ostream& str) const {
+    this->AstNodeDType::dumpSmall(str);
+    str<<"class:"<<name();
+}
 void AstNodeCoverOrAssert::dump(std::ostream& str) const {
     this->AstNode::dump(str);
     if (immediate()) str<<" [IMMEDIATE]";
@@ -1003,6 +1036,13 @@ void AstMemberSel::dump(std::ostream& str) const {
     this->AstNode::dump(str);
     str << " -> ";
     if (varp()) { varp()->dump(str); }
+    else { str << "%Error:UNLINKED"; }
+}
+void AstMethodCall::dump(std::ostream& str) const {
+    this->AstNode::dump(str);
+    if (isStatement()) str << " [STMT]";
+    str << " -> ";
+    if (ftaskp()) { ftaskp()->dump(str); }
     else { str << "%Error:UNLINKED"; }
 }
 void AstModportFTaskRef::dump(std::ostream& str) const {
@@ -1191,6 +1231,7 @@ void AstVar::dump(std::ostream& str) const {
     if (attrClockEn()) str<<" [aCLKEN]";
     if (attrIsolateAssign()) str<<" [aISO]";
     if (attrFileDescr()) str<<" [aFD]";
+    if (isClassMember()) str<<" [MEMBER]";
     if (isFuncReturn()) str<<" [FUNCRTN]";
     else if (isFuncLocal()) str<<" [FUNC]";
     if (isDpiOpenArray()) str<<" [DPIOPENA]";
@@ -1235,6 +1276,7 @@ void AstNodeFTaskRef::dump(std::ostream& str) const {
 }
 void AstNodeFTask::dump(std::ostream& str) const {
     this->AstNode::dump(str);
+    if (classMethod()) str<<" [METHOD]";
     if (taskPublic()) str<<" [PUBLIC]";
     if (prototype()) str<<" [PROTOTYPE]";
     if (dpiImport()) str<<" [DPII]";

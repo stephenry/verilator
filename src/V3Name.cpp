@@ -81,7 +81,7 @@ private:
     // Add __PVT__ to names of local signals
     virtual void visit(AstVar* nodep) {
         // Don't iterate... Don't need temps for RANGES under the Var.
-        rename(nodep, (!m_modp->isTop()
+        rename(nodep, ((!m_modp || !m_modp->isTop())
                        && !nodep->isSigPublic()
                        && !nodep->isFuncLocal()  // Isn't exposed, and would mess up dpi import wrappers
                        && !nodep->isTemp()));  // Don't bother to rename internal signals
@@ -101,6 +101,12 @@ private:
     virtual void visit(AstCell* nodep) {
         if (!nodep->user1()) {
             rename(nodep, !nodep->modp()->modPublic());
+            iterateChildren(nodep);
+        }
+    }
+    virtual void visit(AstClass* nodep) {
+        if (!nodep->user1()) {
+            rename(nodep, true);
             iterateChildren(nodep);
         }
     }

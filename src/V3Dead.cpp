@@ -97,6 +97,7 @@ private:
     std::vector<AstVarScope*>   m_vscsp;        // List of all encountered to avoid another loop through tree
     std::vector<AstScope*>      m_scopesp;      // List of all encountered to avoid another loop through tree
     std::vector<AstCell*>       m_cellsp;       // List of all encountered to avoid another loop through tree
+    std::vector<AstClass*>      m_classesp;     // List of all encountered to avoid another loop through tree
     AssignMap                   m_assignMap;    // List of all simple assignments for each variable
     bool                        m_elimUserVars; // Allow removal of user's vars
     bool                        m_elimDTypes;   // Allow removal of DTypes
@@ -185,6 +186,10 @@ private:
             else nodep->packagep()->user1Inc();
         }
     }
+    virtual void visit(AstMethodCall* nodep) {
+        iterateChildren(nodep);
+        checkAll(nodep);
+    }
     virtual void visit(AstRefDType* nodep) {
         iterateChildren(nodep);
         checkDType(nodep);
@@ -192,6 +197,24 @@ private:
         if (nodep->packagep()) {
             if (m_elimCells) nodep->packagep(NULL);
             else nodep->packagep()->user1Inc();
+        }
+    }
+    virtual void visit(AstClass* nodep) {
+        iterateChildren(nodep);
+        checkAll(nodep);
+        if (nodep->extendsp()) nodep->extendsp()->user1Inc();
+        m_classesp.push_back(nodep);
+    }
+    virtual void visit(AstClassRefDType* nodep) {
+        iterateChildren(nodep);
+        checkDType(nodep);
+        checkAll(nodep);
+        if (nodep->packagep()) {
+            if (m_elimCells) nodep->packagep(NULL);
+            else nodep->packagep()->user1Inc();
+        }
+        if (nodep->classp()) {
+            nodep->classp()->user1Inc();
         }
     }
     virtual void visit(AstNodeDType* nodep) {
@@ -206,6 +229,12 @@ private:
             if (m_elimCells) nodep->packagep(NULL);
             else nodep->packagep()->user1Inc();
         }
+        checkAll(nodep);
+    }
+    virtual void visit(AstMemberSel* nodep) {
+        iterateChildren(nodep);
+        if (nodep->varp()) nodep->varp()->user1Inc();
+        if (nodep->fromp()->dtypep()) nodep->fromp()->dtypep()->user1Inc();  // classref
         checkAll(nodep);
     }
     virtual void visit(AstModport* nodep) {
@@ -334,6 +363,22 @@ private:
             }
         }
     }
+    void deadCheckClasses() {
+        for (bool retry = true; retry;) {
+            retry = false;
+            for (std::vector<AstClass*>::iterator it = m_classesp.begin(); it != m_classesp.end();
+                 ++it) {
+                if (AstClass* nodep = *it) {  // NULL if deleted earlier
+                    if (nodep->user1() == 0) {
+                        if (nodep->extendsp()) nodep->extendsp()->user1Inc(-1);
+                        pushDeletep(nodep->unlinkFrBack()); VL_DANGLING(nodep);
+                        *it = NULL;
+                        retry = true;
+                    }
+                }
+            }
+        }
+    }
 
     void deadCheckVar() {
         // Delete any unused varscopes
@@ -414,6 +459,7 @@ public:
         // Otherwise we have no easy way to know if a scope is used
         if (elimScopes) deadCheckScope();
         if (elimCells) deadCheckCells();
+        deadCheckClasses();
         // Modules after vars, because might be vars we delete inside a mod we delete
         deadCheckMod();
 

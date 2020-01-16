@@ -1613,6 +1613,7 @@ private:
                      && m_doNConst
                      && v3Global.opt.oConst()
                      // Default value, not a "known" constant for this usage
+                     && !nodep->varp()->isClassMember()
                      && !(nodep->varp()->isFuncLocal()
                           && nodep->varp()->isNonOutput())
                      && !nodep->varp()->noSubst()

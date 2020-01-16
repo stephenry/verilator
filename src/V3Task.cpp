@@ -206,6 +206,7 @@ private:
         TaskBaseVertex* lastVxp = m_curVxp;
         m_curVxp = getFTaskVertex(nodep);
         if (nodep->dpiImport()) m_curVxp->noInline(true);
+        if (nodep->classMethod()) m_curVxp->noInline(true);  // Until V3Task supports it
         iterateChildren(nodep);
         m_curVxp = lastVxp;
     }
