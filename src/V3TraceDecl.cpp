@@ -228,7 +228,7 @@ private:
                     iterate(varp->dtypeSkipRefp());
                 }
                 // Cleanup
-                if (m_traValuep) { m_traValuep->deleteTree(); m_traValuep = NULL; }
+                if (m_traValuep) VL_DO_CLEAR(m_traValuep->deleteTree(), m_traValuep = NULL);
             }
             m_traVscp = NULL;
             m_traValuep = NULL;
@@ -273,7 +273,7 @@ private:
                                                       i - nodep->lsb());
 
                         iterate(subtypep);
-                        m_traValuep->deleteTree(); m_traValuep = NULL;
+                        VL_DO_CLEAR(m_traValuep->deleteTree(), m_traValuep = NULL);
                     }
                     m_traShowname = oldShowname;
                     m_traValuep = oldValuep;
@@ -299,7 +299,7 @@ private:
                                                  (i - nodep->lsb())*subtypep->width(),
                                                  subtypep->width());
                         iterate(subtypep);
-                        m_traValuep->deleteTree(); m_traValuep = NULL;
+                        VL_DO_CLEAR(m_traValuep->deleteTree(), m_traValuep = NULL);
                     }
                     m_traShowname = oldShowname;
                     m_traValuep = oldValuep;
@@ -330,7 +330,7 @@ private:
                                                          m_traValuep->cloneTree(true),
                                                          itemp->lsb(), subtypep->width());
                                 iterate(subtypep);
-                                m_traValuep->deleteTree(); m_traValuep = NULL;
+                                VL_DO_CLEAR(m_traValuep->deleteTree(), m_traValuep = NULL);
                             } else {  // Else union, replicate fields
                                 iterate(subtypep);
                             }
