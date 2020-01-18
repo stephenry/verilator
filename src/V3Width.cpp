@@ -1081,7 +1081,7 @@ private:
             if (VN_IS(nodep->fromp()->dtypep(), QueueDType)) {
                 switch (nodep->attrType()) {
                 case AstAttrType::DIM_SIZE: {
-                    AstNode* newp = new AstCMethodCall(
+                    AstNode* newp = new AstCMethodHard(
                         nodep->fileline(), nodep->fromp()->unlinkFrBack(), "size", NULL);
                     newp->dtypeSetSigned32();
                     newp->didWidth(true);
@@ -1097,7 +1097,7 @@ private:
                 }
                 case AstAttrType::DIM_RIGHT:
                 case AstAttrType::DIM_HIGH: {
-                    AstNode* sizep = new AstCMethodCall(
+                    AstNode* sizep = new AstCMethodHard(
                         nodep->fileline(), nodep->fromp()->unlinkFrBack(), "size", NULL);
                     sizep->dtypeSetSigned32();
                     sizep->didWidth(true);
@@ -1830,7 +1830,7 @@ private:
         return false;
     }
 
-    virtual void visit(AstCMethodCall* nodep) {
+    virtual void visit(AstCMethodHard* nodep) {
         // Never created before V3Width, so no need to redo it
         UASSERT_OBJ(nodep->dtypep(), nodep, "CMETHODCALLs should have already been sized");
     }
@@ -1981,11 +1981,11 @@ private:
         }
     }
     void methodCallAssoc(AstMethodCall* nodep, AstAssocArrayDType* adtypep) {
-        AstCMethodCall* newp = NULL;
+        AstCMethodHard* newp = NULL;
         if (nodep->name() == "num"  // function int num()
             || nodep->name() == "size") {
             methodOkArguments(nodep, 0, 0);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       "size", NULL);  // So don't need num()
             newp->dtypeSetSigned32();
@@ -1997,7 +1997,7 @@ private:
                    || nodep->name() == "prev") {
             methodOkArguments(nodep, 1, 1);
             AstNode* index_exprp = methodCallAssocIndexExpr(nodep, adtypep);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       nodep->name(),  // first/last/next/prev
                                       index_exprp->unlinkFrBack());
@@ -2008,7 +2008,7 @@ private:
             // IEEE really should have made this a "bit" return
             methodOkArguments(nodep, 1, 1);
             AstNode* index_exprp = methodCallAssocIndexExpr(nodep, adtypep);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       "exists", index_exprp->unlinkFrBack());
             newp->dtypeSetSigned32();
@@ -2019,14 +2019,14 @@ private:
             methodOkArguments(nodep, 0, 1);
             methodCallLValue(nodep, nodep->fromp(), true);
             if (!nodep->pinsp()) {
-                newp = new AstCMethodCall(nodep->fileline(),
+                newp = new AstCMethodHard(nodep->fileline(),
                                           nodep->fromp()->unlinkFrBack(),
                                           "clear", NULL);
                 newp->protect(false);
                 newp->makeStatement();
             } else {
                 AstNode* index_exprp = methodCallAssocIndexExpr(nodep, adtypep);
-                newp = new AstCMethodCall(nodep->fileline(),
+                newp = new AstCMethodHard(nodep->fileline(),
                                           nodep->fromp()->unlinkFrBack(),
                                           "erase",
                                           index_exprp->unlinkFrBack());
@@ -2058,11 +2058,11 @@ private:
         }
     }
     void methodCallQueue(AstMethodCall* nodep, AstQueueDType* adtypep) {
-        AstCMethodCall* newp = NULL;
+        AstCMethodHard* newp = NULL;
         if (nodep->name() == "at") {  // Created internally for []
             methodOkArguments(nodep, 1, 1);
             methodCallLValue(nodep, nodep->fromp(), true);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       "at", NULL);
             newp->dtypeFrom(adtypep->subDTypep());
@@ -2071,7 +2071,7 @@ private:
         } else if (nodep->name() == "num"  // function int num()
             || nodep->name() == "size") {
             methodOkArguments(nodep, 0, 0);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       "size", NULL);
             newp->dtypeSetSigned32();
@@ -2081,7 +2081,7 @@ private:
             methodOkArguments(nodep, 0, 1);
             methodCallLValue(nodep, nodep->fromp(), true);
             if (!nodep->pinsp()) {
-                newp = new AstCMethodCall(nodep->fileline(),
+                newp = new AstCMethodHard(nodep->fileline(),
                                           nodep->fromp()->unlinkFrBack(),
                                           "clear", NULL);
                 newp->protect(false);
@@ -2089,7 +2089,7 @@ private:
             } else {
                 AstNode* index_exprp = methodCallQueueIndexExpr(nodep);
                 if (index_exprp->isZero()) {  // delete(0) is a pop_front
-                    newp = new AstCMethodCall(nodep->fileline(),
+                    newp = new AstCMethodHard(nodep->fileline(),
                                               nodep->fromp()->unlinkFrBack(),
                                               "pop_front", NULL);
                     newp->dtypeFrom(adtypep->subDTypep());
@@ -2098,7 +2098,7 @@ private:
                     newp->makeStatement();
                 } else {
                     nodep->v3error("Unsupported: Queue .delete(index) method, as is O(n) complexity and slow.");
-                    newp = new AstCMethodCall(nodep->fileline(),
+                    newp = new AstCMethodHard(nodep->fileline(),
                                               nodep->fromp()->unlinkFrBack(),
                                               "erase", index_exprp->unlinkFrBack());
                     newp->protect(false);
@@ -2112,14 +2112,14 @@ private:
             AstArg* argp = VN_CAST(nodep->pinsp()->nextp(), Arg);
             iterateCheckTyped(nodep, "insert value", argp->exprp(), adtypep->subDTypep(), BOTH);
             if (index_exprp->isZero()) {  // insert(0, ...) is a push_front
-                newp = new AstCMethodCall(nodep->fileline(),
+                newp = new AstCMethodHard(nodep->fileline(),
                                           nodep->fromp()->unlinkFrBack(),
                                           "push_front", argp->exprp()->unlinkFrBack());
                 newp->protect(false);
                 newp->makeStatement();
             } else {
                 nodep->v3error("Unsupported: Queue .insert method, as is O(n) complexity and slow.");
-                newp = new AstCMethodCall(nodep->fileline(),
+                newp = new AstCMethodHard(nodep->fileline(),
                                           nodep->fromp()->unlinkFrBack(),
                                           nodep->name(),
                                           index_exprp->unlinkFrBack());
@@ -2131,7 +2131,7 @@ private:
                    || nodep->name() == "pop_back") {
             methodOkArguments(nodep, 0, 0);
             methodCallLValue(nodep, nodep->fromp(), true);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       nodep->name(), NULL);
             newp->dtypeFrom(adtypep->subDTypep());
@@ -2146,7 +2146,7 @@ private:
             methodCallLValue(nodep, nodep->fromp(), true);
             AstArg* argp = VN_CAST(nodep->pinsp(), Arg);
             iterateCheckTyped(nodep, "push value", argp->exprp(), adtypep->subDTypep(), BOTH);
-            newp = new AstCMethodCall(nodep->fileline(),
+            newp = new AstCMethodHard(nodep->fileline(),
                                       nodep->fromp()->unlinkFrBack(),
                                       nodep->name(), argp->exprp()->unlinkFrBack());
             newp->protect(false);
