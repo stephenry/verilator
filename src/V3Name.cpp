@@ -59,6 +59,7 @@ private:
             if (addPvt) {
                 string newname = string("__PVT__")+nodep->name();
                 nodep->name(newname);
+                nodep->editCountInc();
             } else {
                 string rsvd = m_words.isKeyword(nodep->name());
                 if (rsvd != "") {
@@ -66,6 +67,7 @@ private:
                                   +": "<<nodep->prettyNameQ());
                     string newname = string("__SYM__")+nodep->name();
                     nodep->name(newname);
+                    nodep->editCountInc();
                 }
             }
             nodep->user1(1);
@@ -74,9 +76,12 @@ private:
 
     // VISITORS
     virtual void visit(AstNodeModule* nodep) {
-        m_modp = nodep;
-        iterateChildren(nodep);
-        m_modp = NULL;
+        AstNodeModule* origModp = m_modp;
+        {
+            m_modp = nodep;
+            iterateChildren(nodep);
+        }
+        m_modp = origModp;
     }
     // Add __PVT__ to names of local signals
     virtual void visit(AstVar* nodep) {

@@ -51,7 +51,10 @@ typedef std::set<int> MTaskIdSet;  // Set of mtaskIds for Var sorting
 //######################################################################
 
 // For broken() function, return error string if have a match
-#define BROKEN_RTN(test) do { if (VL_UNCOVERABLE(test)) return # test; } while(0)
+#define BROKEN_RTN(test) \
+    do { \
+        if (VL_UNCOVERABLE(test)) return #test; \
+    } while (0)
 
 // (V)erilator (N)ode is: True if AstNode is of a a given AstType
 #define VN_IS(nodep,nodetypename) (AstNode::privateIs ## nodetypename(nodep))
@@ -2247,7 +2250,7 @@ public:
     AstActive* activesp() const { return VN_CAST(op3p(), Active); }  // op3 = List of i/sblocks
     // METHODS
     void addInlinesp(AstNode* nodep) { addOp1p(nodep); }
-    void addStmtp(AstNode* nodep) { addOp2p(nodep); }
+    void addStmtp(AstNode* nodep) { addNOp2p(nodep); }
     void addActivep(AstNode* nodep) { addOp3p(nodep); }
     // ACCESSORS
     virtual void name(const string& name) { m_name = name; }
