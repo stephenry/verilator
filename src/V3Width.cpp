@@ -2172,9 +2172,9 @@ private:
         AstMethodCall* newp = NULL;
         for (AstClass* classp = first_classp; classp;) {
             if (AstNodeFTask* ftaskp = VN_CAST(classp->findMember(nodep->name()), NodeFTask)) {
-                nodep->ftaskp(ftaskp);
+                nodep->taskp(ftaskp);
                 nodep->dtypeFrom(ftaskp);
-                ftaskp->dumpTree(cout, "FIXMEfound: ");
+                //ftaskp->dumpTree(cout, "FIXMEfound: ");
                 if (VN_IS(ftaskp, Task)) nodep->makeStatement();
                 return;
             }

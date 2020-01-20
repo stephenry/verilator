@@ -88,6 +88,27 @@ const char* AstNodeUOrStructDType::broken() const {
     return NULL;
 }
 
+void AstNodeCCall::dump(std::ostream& str) const {
+    this->AstNode::dump(str);
+    if (funcp()) {
+        str << " " << funcp()->name() << " => ";
+        funcp()->dump(str);
+    } else {
+        str << " " << name();
+    }
+}
+void AstNodeCCall::cloneRelink() {
+    if (m_funcp && m_funcp->clonep()) { m_funcp = m_funcp->clonep(); }
+}
+const char* AstNodeCCall::broken() const {
+    BROKEN_RTN(m_funcp && !m_funcp->brokeExists());
+    return NULL;
+}
+bool AstNodeCCall::isPure() const { return funcp()->pure(); }
+string AstNodeCCall::hiernameProtect() const {
+    return VIdProtect::protectWordsIf(hiername(), protect());
+}
+
 void AstNodeCond::numberOperate(V3Number& out, const V3Number& lhs,
                                 const V3Number& rhs, const V3Number& ths) {
     if (lhs.isNeqZero()) out.opAssign(rhs); else out.opAssign(ths);
@@ -672,10 +693,6 @@ AstNode* AstArraySel::baseFromp(AstNode* nodep) {  ///< What is the base variabl
     return nodep;
 }
 
-string AstCCall::hiernameProtect() const {
-    return VIdProtect::protectWordsIf(hiername(), protect());
-}
-
 const char* AstScope::broken() const {
     BROKEN_RTN(m_aboveScopep && !m_aboveScopep->brokeExists());
     BROKEN_RTN(m_aboveCellp && !m_aboveCellp->brokeExists());
@@ -1042,8 +1059,11 @@ void AstMethodCall::dump(std::ostream& str) const {
     this->AstNode::dump(str);
     if (isStatement()) str << " [STMT]";
     str << " -> ";
-    if (ftaskp()) { ftaskp()->dump(str); }
-    else { str << "%Error:UNLINKED"; }
+    if (taskp()) {
+        taskp()->dump(str);
+    } else {
+        str << " -> UNLINKED";
+    }
 }
 void AstModportFTaskRef::dump(std::ostream& str) const {
     this->AstNode::dump(str);
@@ -1331,13 +1351,6 @@ void AstCFile::dump(std::ostream& str) const {
     this->AstNode::dump(str);
     if (source()) str<<" [SRC]";
     if (slow()) str<<" [SLOW]";
-}
-void AstCCall::dump(std::ostream& str) const {
-    this->AstNode::dump(str);
-    if (funcp()) {
-        str<<" "<<funcp()->name()<<" => ";
-        funcp()->dump(str);
-    }
 }
 void AstCFunc::dump(std::ostream& str) const {
     this->AstNode::dump(str);

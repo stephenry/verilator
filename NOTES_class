@@ -9,7 +9,6 @@ Next steps:
 * Once member functions work plan on merging to master.
 
 Once in master, file a bug on adding these that others can probably help:
-* _Class .cpp output needs to honor --split
 * Enable V3Task function inlining
 * Warn on unused class
 * Warn on unused members
@@ -18,8 +17,17 @@ Once in master, file a bug on adding these that others can probably help:
   -- See github sv_tests as a starting point, though note these need work to be good self-checking
      tests tests
 
+Tests:
+* calling methods with implied "this"
+* calling methods with explicit "this"
+* static methods calling non-static methods (i.e. no "this")
+
 ----------
 Imp TODO notes:
+
+Should __Classes.c/h be closer to a tweak on how NodeModule's are emitted?
+E.g. static variables should probably be in the NodeModule .cpp files, so put implementations
+there too?
 
 Methods need as arguments:
    Need "this" -- unless static

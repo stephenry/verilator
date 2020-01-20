@@ -109,12 +109,6 @@ private:
             iterateChildren(nodep);
         }
     }
-    virtual void visit(AstClass* nodep) {
-        if (!nodep->user1()) {
-            rename(nodep, true);
-            iterateChildren(nodep);
-        }
-    }
     virtual void visit(AstMemberDType* nodep) {
         if (!nodep->user1()) {
             rename(nodep, false);
@@ -131,10 +125,13 @@ private:
         if (!nodep->user1SetOnce()) {
             if (nodep->aboveScopep()) iterate(nodep->aboveScopep());
             if (nodep->aboveCellp()) iterate(nodep->aboveCellp());
-            // Always recompute name (as many level above scope may have changed)
+            // Always recompute name (as many levels above scope may have changed)
             // Same formula as V3Scope
             nodep->name(nodep->isTop() ? "TOP"
-                        : (nodep->aboveScopep()->name()+"."+nodep->aboveCellp()->name()));
+                        : VN_IS(m_modp, Class)
+                        ? (nodep->aboveScopep()->name() + "." + m_modp->name())
+                        : (nodep->aboveScopep()->name() + "." + nodep->aboveCellp()->name()));
+            nodep->editCountInc();
             iterateChildren(nodep);
         }
     }

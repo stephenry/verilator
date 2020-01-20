@@ -1777,7 +1777,7 @@ private:
         }
         iterateChildren(nodep);
     }
-    virtual void visit(AstCCall* nodep) {
+    virtual void visit(AstNodeCCall* nodep) {
         iterateChildren(nodep);
         // Enter the function and trace it
         m_tracingCall = true;

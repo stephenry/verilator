@@ -104,7 +104,8 @@ private:
         //
         // V3Combine wouldn't likely be able to combine top-level
         // routines anyway, so there's no harm in keeping these static.
-        if (m_modp->isTop()) relativeRefOk = false;
+        if (m_modp && m_modp->isTop()) relativeRefOk = false;
+        //
         //
         // Use absolute refs if this scope is the only instance of the module.
         // Saves a bit of overhead on passing the 'this' pointer, and there's no
@@ -112,6 +113,16 @@ private:
         // The risk that this prevents combining identical logic from differently-
         // named but identical modules seems low.
         if (m_modSingleton) relativeRefOk = false;
+        //
+        // Class methods need relative
+        if (m_modp && VN_IS(m_modp, Class)) relativeRefOk = true;
+
+        if (varp) {
+            UINFO(1, "FIXME descopedName rrok=" << relativeRefOk <<endl);
+            UINFO(1, " varp="<<varp<<endl);
+            UINFO(1, " scopep="<<scopep<<endl);
+            UINFO(1, " m_scopep="<<m_scopep<<endl);
+        }
 
         if (varp && varp->isFuncLocal()) {
             hierThisr = true;
@@ -258,7 +269,7 @@ private:
         nodep->hierThis(hierThis);
         nodep->varScopep(NULL);
     }
-    virtual void visit(AstCCall* nodep) {
+    virtual void visit(AstNodeCCall* nodep) {
         // UINFO(9,"       "<<nodep<<endl);
         iterateChildren(nodep);
         // Convert the hierch name

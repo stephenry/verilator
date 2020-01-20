@@ -75,7 +75,7 @@ private:
              it!=m_varRefScopes.end(); ++it) {
             AstVarRef* nodep = it->first;
             AstScope* scopep = it->second;
-            UINFO(2, "FIXME get vrs n s "<<nodep<<"   "<<scopep<<endl);
+            UINFO(9, "FIXME get vrs n s "<<nodep<<"   "<<scopep<<endl);
             if (nodep->packagep()
                 // FIXME check below-- What was happening is this overrides
                 // top.$unit.Cls with top.$unit breaking the var.
@@ -83,10 +83,10 @@ private:
                 PackageScopeMap::iterator it2 = m_packageScopes.find(nodep->packagep());
                 UASSERT_OBJ(it2 != m_packageScopes.end(), nodep, "Can't locate package scope");
                 scopep = it2->second;
-                UINFO(2, "FIXME via package "<<nodep->packagep()<<endl);
+                UINFO(9, "FIXME via package "<<nodep->packagep()<<endl);
             }
-            UINFO(2, "FIXME vp "<<nodep->varp()<<endl)
-            UINFO(2, "FIXME scopep "<<scopep<<endl)
+            UINFO(9, "FIXME vp "<<nodep->varp()<<endl)
+            UINFO(9, "FIXME scopep "<<scopep<<endl)
             VarScopeMap::iterator it3 = m_varScopes.find(make_pair(nodep->varp(), scopep));
             UASSERT_OBJ(it3 != m_varScopes.end(), nodep, "Can't locate varref scope");
             AstVarScope* varscp = it3->second;
@@ -298,8 +298,8 @@ private:
                 nodep->attrClocker(VVarAttrClocker::CLOCKER_NO);
             }
             UASSERT_OBJ(m_scopep, nodep, "No scope for var");
-            UINFO(2, "FIXME insert vp "<<nodep<<endl)
-            UINFO(2, "FIXME insert scopep "<<m_scopep<<endl)
+            UINFO(9, "FIXME insert vp "<<nodep<<endl)
+            UINFO(9, "FIXME insert scopep "<<m_scopep<<endl)
             m_varScopes.insert(make_pair(make_pair(nodep, m_scopep), varscp));
             m_scopep->addVarp(varscp);
         }
@@ -314,7 +314,7 @@ private:
             // We may have not made the variable yet, and we can't make it now as
             // the var's referenced package etc might not be created yet.
             // So push to a list and post-correct
-            UINFO(2, "FIXME insert vrs n s "<<nodep<<"   "<<m_scopep<<endl);
+            UINFO(9, "FIXME insert vrs n s "<<nodep<<"   "<<m_scopep<<endl);
             m_varRefScopes.insert(make_pair(nodep, m_scopep));
         }
    }
@@ -432,7 +432,7 @@ private:
             UASSERT_OBJ(newp, nodep, "No clone for package function");
             nodep->taskp(newp);
             UINFO(9,"   New pkg-taskref "<<nodep<<endl);
-        } else {
+        } else if (!VN_IS(nodep, MethodCall)) {
             nodep->taskp(NULL);
             UINFO(9,"   New pkg-taskref "<<nodep<<endl);
         }

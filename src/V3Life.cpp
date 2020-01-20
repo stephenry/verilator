@@ -410,7 +410,7 @@ private:
         bodyLifep->lifeToAbove();
         VL_DO_DANGLING(delete bodyLifep, bodyLifep);
     }
-    virtual void visit(AstCCall* nodep) {
+    virtual void visit(AstNodeCCall* nodep) {
         //UINFO(4,"  CCALL "<<nodep<<endl);
         iterateChildren(nodep);
         // Enter the function and trace it
@@ -420,7 +420,7 @@ private:
         }
     }
     virtual void visit(AstCFunc* nodep) {
-        //UINFO(4,"  CCALL "<<nodep<<endl);
+        //UINFO(4,"  CFUNC "<<nodep<<endl);
         if (!m_tracingCall && !nodep->entryPoint()) return;
         m_tracingCall = false;
         if (nodep->dpiImport() && !nodep->pure()) {

@@ -1008,6 +1008,9 @@ private:
         }
         m_modp = origModp;
     }
+    virtual void visit(AstClass* nodep) {
+    }
+
     virtual void visit(AstScope* nodep) {
         UINFO(4," SCOPE "<<nodep<<endl);
         m_scopep = nodep;
@@ -1036,7 +1039,7 @@ private:
     }
     virtual void visit(AstVarScope* nodep) {
         // Create links to all input signals
-        if (m_modp->isTop() && nodep->varp()->isNonOutput()) {
+        if (m_modp && m_modp->isTop() && nodep->varp()->isNonOutput()) {
             OrderVarVertex* varVxp = newVarUserVertex(nodep, WV_STD);
             new OrderEdge(&m_graph, m_inputsVxp, varVxp, WEIGHT_INPUT);
         }

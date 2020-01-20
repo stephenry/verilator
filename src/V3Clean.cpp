@@ -280,7 +280,7 @@ private:
         iterateChildren(nodep);
         insureCleanAndNext(nodep->bodysp());
     }
-    virtual void visit(AstCCall* nodep) {
+    virtual void visit(AstNodeCCall* nodep) {
         iterateChildren(nodep);
         insureCleanAndNext(nodep->argsp());
         setClean(nodep, true);

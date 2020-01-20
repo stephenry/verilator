@@ -293,8 +293,13 @@ public:
             puts(".data()");  // Access returned std::array as C array
         }
     }
-    virtual void visit(AstCCall* nodep) {
-        puts(nodep->hiernameProtect());
+    virtual void visit(AstNodeCCall* nodep) {
+        if (AstCMethodCall* ccallp = VN_CAST(nodep, CMethodCall)) {
+            iterate(ccallp->fromp());
+            puts("->");
+        } else {
+            puts(nodep->hiernameProtect());
+        }
         puts(nodep->funcp()->nameProtect());
         puts("(");
         puts(nodep->argTypes());
@@ -1479,6 +1484,41 @@ class EmitCImp : EmitCStmts {
             v3fatalSrc("Unknown node type in reset generator: "<<varp->prettyTypeName());
         }
         return "";
+    }
+
+    void emitClassImp(AstClass* nodep) {
+        // FIXME elsehwere make AstCFunc and inside use AstText or something
+        puts("std::string " + nodep->nameProtect() + "::to_string() const {\n");
+        puts(  "return std::string(\"`{\") + to_string_middle() + \"}\";\n");
+        puts("}\n");
+        puts("std::string " + nodep->nameProtect() + "::to_string_middle() const {\n");
+        puts(  "std::string out;\n");
+        std::string comma;
+        for (AstNode* itemp = nodep->membersp(); itemp; itemp = itemp->nextp()) {
+            if (VN_IS(itemp, Var)) {
+                puts("out += \"");
+                puts(comma);
+                puts(itemp->origNameProtect());
+                puts(":\" + VL_TO_STRING(");
+                puts(itemp->nameProtect());
+                puts(");\n");
+                comma = ", ";
+                nodep->user1(true);  // So what we extend dumps this
+            }
+        }
+        if (nodep->extendsp() && nodep->extendsp()->classp()->user1()) {
+            puts("out += ");
+            if (!comma.empty()) puts("\", \"+ ");
+            comma = ", ";
+            puts(nodep->extendsp()->dtypep()->nameProtect());
+            puts("::to_string_middle();\n");
+            nodep->user1(true);  // So what we extend dumps this
+        }
+        puts(  "return out;\n");
+        puts("}\n");
+        puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj) {\n");
+        puts(  "return (obj ? obj->to_string() : \"null\");\n");
+        puts("}\n");
     }
 
     void emitCellCtors(AstNodeModule* modp);
@@ -2802,6 +2842,7 @@ void EmitCImp::emitImp(AstNodeModule* modp) {
         emitCtorImp(modp);
         emitConfigureImp(modp);
         emitDestructorImp(modp);
+        if (AstClass* classp = VN_CAST(modp, Class)) emitClassImp(classp);
         emitSavableImp(modp);
         emitCoverageImp(modp);
     }
@@ -2894,10 +2935,14 @@ class EmitCClassesInt : EmitCStmts {
             puts("// MEMBERS\n");
             emitVarList(nodep->membersp(), EVL_FUNC_ALL, "");
         }
+
         ofp()->putsPrivate(false);
-        puts(  "// METHODS\n");
+        puts(  "// INTERNAL METHODS\n");
+        emitIntFuncDecls(nodep);
+        ofp()->putsPrivate(false);
         puts(  "std::string to_string() const;\n");
         puts(  "std::string to_string_middle() const;\n");
+
         puts("};\n");
         puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj);\n");
     }
@@ -2913,76 +2958,14 @@ public:
         ofp()->putsGuard();
 
         puts("\n");
-        puts("#include \"" + symClassName() + ".h\"\n");
+        puts("class " + EmitCBaseVisitor::symClassName() + ";\n");
+        // Can't include symClassName().h as that includes this file
 
-        for (AstNode* nodep = v3Global.rootp()->miscsp(); nodep; nodep = nodep->nextp()) {
+        for (AstNode* nodep = v3Global.rootp()->modulesp(); nodep; nodep = nodep->nextp()) {
             if (AstClass* classp = VN_CAST(nodep, Class)) iterate(classp);
         }
 
         ofp()->putsEndGuard();
-    }
-};
-
-//######################################################################
-// Classes implementation
-
-class EmitCClassesImp : EmitCStmts {
-    //  AstNode::user1()        -> bool.  Class (or extended class) has members
-    AstUser1InUse m_inuser1;
-
-    virtual void visit(AstClass* nodep) {
-        puts("\n");
-        puts("// class " + nodep->nameProtect() + "\n");
-        puts("std::string " + nodep->nameProtect() + "::to_string() const {\n");
-        puts(  "return std::string(\"`{\") + to_string_middle() + \"}\";\n");
-        puts("}\n");
-        puts("std::string " + nodep->nameProtect() + "::to_string_middle() const {\n");
-        puts(  "std::string out;\n");
-        std::string comma;
-        for (AstNode* itemp = nodep->membersp(); itemp; itemp = itemp->nextp()) {
-            if (VN_IS(itemp, Var)) {
-                puts("out += \"");
-                puts(comma);
-                puts(itemp->origNameProtect());
-                puts(":\" + VL_TO_STRING(");
-                puts(itemp->nameProtect());
-                puts(");\n");
-                comma = ", ";
-                nodep->user1(true);  // So what we extend dumps this
-            }
-        }
-        if (nodep->extendsp() && nodep->extendsp()->classp()->user1()) {
-            puts("out += ");
-            if (!comma.empty()) puts("\", \"+ ");
-            comma = ", ";
-            puts(nodep->extendsp()->dtypep()->nameProtect());
-            puts("::to_string_middle();\n");
-            nodep->user1(true);  // So what we extend dumps this
-        }
-        puts(  "return out;\n");
-        puts("}\n");
-        puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj) {\n");
-        puts(  "return (obj ? obj->to_string() : \"null\");\n");
-        puts("}\n");
-    }
-public:
-    explicit EmitCClassesImp() {}
-    virtual ~EmitCClassesImp() {}
-    void main() {
-        // Put out the file
-        string filename = classesFilename() + ".cpp";
-        newCFile(filename, false/*slow*/, true/*source*/);
-        m_ofp = new V3OutCFile(v3Global.opt.makeDir() + "/" + filename);
-        m_ofp->putsHeader();
-        m_ofp->puts("// DESCR"
-                    "IPTION: Verilator output: User class implementation header\n");
-
-        puts("\n");
-        puts("#include \"" + classesFilename() + ".h\"\n");
-
-        for (AstNode* nodep = v3Global.rootp()->miscsp(); nodep; nodep = nodep->nextp()) {
-            if (AstClass* classp = VN_CAST(nodep, Class)) iterate(classp);
-        }
     }
 };
 
@@ -3415,7 +3398,6 @@ void V3EmitC::emitc() {
 void V3EmitC::emitcClasses() {
     if (!v3Global.needClasses()) return;
     { EmitCClassesInt c; c.main(); }
-    { EmitCClassesImp c; c.main(); }
 }
 
 void V3EmitC::emitcTrace() {

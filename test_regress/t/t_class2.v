@@ -3,25 +3,33 @@
 // This file ONLY is placed into the Public Domain, for any use,
 // without warranty, 2020 by Wilson Snyder.
 
-typedef class Cls;
-
+// Note UVM internals do not require classes-in-classes
+package P;
 class Cls;
    int imembera;
    int imemberb;
 endclass : Cls
+endpackage : P
+
+class Dead;
+endclass
 
 module t (/*AUTOARG*/);
+   P::Cls c;
+   P::Cls d;
    initial begin
-      Cls c;
-      if (c != null) $stop;
-      $display("Display: null = \"%p\"", c);  // null
+      // Alternate between two versions to make sure we don't
+      // constant propagate between them.
       c = new;
-      $display("Display: newed = \"%p\"", c);  // '{imembera:0, imemberb:0}
+      d = new;
       c.imembera = 10;
+      d.imembera = 11;
       c.imemberb = 20;
-      $display("Display: set = \"%p\"", c);  // '{imembera:10, imemberb:20}
+      d.imemberb = 21;
       if (c.imembera != 10) $stop;
+      if (d.imembera != 11) $stop;
       if (c.imemberb != 20) $stop;
+      if (d.imemberb != 21) $stop;
       $write("*-* All Finished *-*\n");
       $finish;
    end

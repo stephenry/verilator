@@ -190,6 +190,7 @@ private:
         m_assignwp = NULL;
     }
     virtual void visit(AstNodeFTaskRef* nodep) {
+        // Includes handling AstMethodCall
         if (m_assignwp) {
             // Wire assigns must become always statements to deal with insertion
             // of multiple statements.  Perhaps someday make all wassigns into always's?
@@ -488,7 +489,12 @@ private:
         //
         AstNode* beginp = new AstComment(refp->fileline(),
                                          string("Function: ")+refp->name(), true);
-        AstCCall* ccallp = new AstCCall(refp->fileline(), cfuncp, NULL);
+        AstNodeCCall* ccallp;
+        if (AstMethodCall* mrefp = VN_CAST(refp, MethodCall)) {
+            ccallp = new AstCMethodCall(refp->fileline(), mrefp->fromp()->unlinkFrBack(), cfuncp);
+        } else {
+            ccallp = new AstCCall(refp->fileline(), cfuncp);
+        }
         beginp->addNext(ccallp);
 
         // Convert complicated outputs to temp signals
@@ -995,7 +1001,7 @@ private:
         cfuncp->funcPublic(nodep->taskPublic());
         cfuncp->dpiExport(nodep->dpiExport());
         cfuncp->dpiImportWrapper(nodep->dpiImport());
-        cfuncp->isStatic(!(nodep->dpiImport()||nodep->taskPublic()));
+        cfuncp->isStatic(!(nodep->dpiImport() || nodep->taskPublic() || nodep->classMethod()));
         cfuncp->pure(nodep->pure());
         //cfuncp->dpiImport   // Not set in the wrapper - the called function has it set
         if (cfuncp->dpiExport()) cfuncp->cname(nodep->cname());
@@ -1175,7 +1181,7 @@ private:
         }
         // Replace the ref
         AstNode* visitp = NULL;
-        if (VN_IS(nodep, FuncRef)) {
+        if (!nodep->isStatement()) {
             UASSERT_OBJ(nodep->taskp()->isFunction(), nodep, "func reference to non-function");
             AstVarRef* outrefp = new AstVarRef(nodep->fileline(), outvscp, false);
             nodep->replaceWith(outrefp);
@@ -1208,19 +1214,22 @@ private:
             if (nodep->dpiImport()) modes++;
             if (nodep->dpiExport()) modes++;
             if (nodep->taskPublic()) modes++;
+            if (nodep->classMethod()) modes++;
             if (v3Global.opt.protectIds() && nodep->taskPublic()) {
                 // We always call protect() on names, we don't check if public or not
                 // Hence any external references wouldn't be able to find the refed public object.
                 nodep->v3error("Unsupported: Using --protect-ids with public function");
             }
-            if (modes > 1) nodep->v3error("Cannot mix DPI import, DPI export and/or public on same function: "
-                                          <<nodep->prettyNameQ());
+            if (modes > 1)
+                nodep->v3error("Cannot mix DPI import, DPI export, class methods, and/or public "
+                               "on same function: "
+                               << nodep->prettyNameQ());
 
-            if (nodep->dpiImport() || nodep->dpiExport()
-                || nodep->taskPublic() || m_statep->ftaskNoInline(nodep)) {
+            if (nodep->dpiImport() || nodep->dpiExport() || nodep->taskPublic()
+                || m_statep->ftaskNoInline(nodep)) {
                 // Clone it first, because we may have later FTaskRef's that still need
                 // the original version.
-                if (m_statep->ftaskNoInline(nodep)) m_statep->checkPurity(nodep);
+                if (m_statep->ftaskNoInline(nodep) && !nodep->classMethod()) m_statep->checkPurity(nodep);
                 AstNodeFTask* clonedFuncp = nodep->cloneTree(false);
                 AstCFunc* cfuncp = makeUserFunc(clonedFuncp, m_statep->ftaskNoInline(nodep));
                 if (cfuncp) {

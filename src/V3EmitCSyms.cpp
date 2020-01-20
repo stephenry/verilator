@@ -382,7 +382,7 @@ void EmitCSyms::emitClassesFwdHdr() {
     // Not included directly, so no verilated.h etc
 
     puts("\n// USER CLASSES\n");
-    for (AstNode* nodep = v3Global.rootp()->miscsp(); nodep; nodep = nodep->nextp()) {
+    for (AstNode* nodep = v3Global.rootp()->modulesp(); nodep; nodep = nodep->nextp()) {
         if (AstClass* classp = VN_CAST(nodep, Class)) {
             puts("class " + classp->nameProtect() + ";\n");
         }
@@ -452,6 +452,7 @@ void EmitCSyms::emitSymHdr() {
     puts("\n// SUBCELL STATE\n");
     for (std::vector<ScopeModPair>::iterator it = m_scopes.begin(); it != m_scopes.end(); ++it) {
         AstScope* scopep = it->first;  AstNodeModule* modp = it->second;
+        if (VN_IS(modp, Class)) continue;   // FIXME suppresses making scope; need this for static etc
         if (modp->isTop()) {
             ofp()->printf("%-30s ", (modClassName(modp)+"*").c_str());
             puts(protectIf(scopep->nameDotless()+"p", scopep->protect())+";\n");

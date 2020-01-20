@@ -20,7 +20,7 @@
 // V3Class's Transformations:
 //
 // Each class:
-//      Move to just under AstNetlist
+//      Move to be modules under AstNetlist
 //
 //*************************************************************************
 
@@ -54,7 +54,7 @@ private:
         // Handle this class
         nodep->name(m_prefix + nodep->name());
         nodep->unlinkFrBack();
-        v3Global.rootp()->addMiscsp(nodep);
+        v3Global.rootp()->addModulep(nodep);
     }
     virtual void visit(AstPackage* nodep) {
         string prevPrefix = m_prefix;
