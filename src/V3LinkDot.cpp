@@ -730,7 +730,7 @@ class LinkDotFindVisitor : public AstNVisitor {
     }
 
     // VISITs
-    virtual void visit(AstNetlist* nodep) {
+    virtual void visit(AstNetlist* nodep) VL_OVERRIDE {
         // Process $unit or other packages
         // Not needed - dotted references not allowed from inside packages
         //for (AstNodeModule* nodep = v3Global.rootp()->modulesp();
@@ -762,8 +762,8 @@ class LinkDotFindVisitor : public AstNVisitor {
             m_curSymp = m_modSymp = NULL;
         }
     }
-    virtual void visit(AstTypeTable* nodep) {}
-    virtual void visit(AstNodeModule* nodep) {
+    virtual void visit(AstTypeTable* nodep) VL_OVERRIDE {}
+    virtual void visit(AstNodeModule* nodep) VL_OVERRIDE {
         // Called on top module from Netlist, other modules from the cell creating them,
         // and packages
         UINFO(8,"   "<<nodep<<endl);
@@ -825,7 +825,7 @@ class LinkDotFindVisitor : public AstNVisitor {
         // Prep for next
         m_packagep = NULL;
     }
-    virtual void visit(AstClass* nodep) {
+    virtual void visit(AstClass* nodep) VL_OVERRIDE {
         UASSERT_OBJ(m_curSymp, nodep, "Class not under module/package/$unit");
 /* FIXME OLD:
         iterateChildren(nodep);
@@ -865,12 +865,12 @@ class LinkDotFindVisitor : public AstNVisitor {
         m_beginNum    = oldBeginNum;
         m_modBeginNum = oldModBeginNum;
     }
-    virtual void visit(AstScope* nodep) {
+    virtual void visit(AstScope* nodep) VL_OVERRIDE {
         UASSERT_OBJ(m_statep->forScopeCreation(), nodep,
                     "Scopes should only exist right after V3Scope");
         // Ignored.  Processed in next step
     }
-    virtual void visit(AstCell* nodep) {
+    virtual void visit(AstCell* nodep) VL_OVERRIDE {
         UINFO(5,"   CELL under "<<m_scope<<" is "<<nodep<<endl);
         // Process XREFs/etc inside pins
         if (nodep->recursive() && m_inRecursion) return;
@@ -911,7 +911,7 @@ class LinkDotFindVisitor : public AstNVisitor {
         m_paramNum = oldParamNum;
         m_inRecursion = oldRecursion;
     }
-    virtual void visit(AstCellInline* nodep) {
+    virtual void visit(AstCellInline* nodep) VL_OVERRIDE {
         UINFO(5,"   CELLINLINE under "<<m_scope<<" is "<<nodep<<endl);
         VSymEnt* aboveSymp = m_curSymp;
         // If baz__DOT__foo__DOT__bar, we need to find baz__DOT__foo and add bar to it.
@@ -931,11 +931,11 @@ class LinkDotFindVisitor : public AstNVisitor {
             m_statep->insertInline(aboveSymp, m_modSymp, nodep, nodep->name());
         }
     }
-    virtual void visit(AstDefParam* nodep) {
+    virtual void visit(AstDefParam* nodep) VL_OVERRIDE {
         nodep->user1p(m_curSymp);
         iterateChildren(nodep);
     }
-    virtual void visit(AstGenerate* nodep) {
+    virtual void visit(AstGenerate* nodep) VL_OVERRIDE {
         // Begin: ... blocks often replicate under genif/genfor, so simply
         // suppress duplicate checks.  See t_gen_forif.v for an example.
         bool lastInGen = m_inGenerate;
@@ -945,7 +945,7 @@ class LinkDotFindVisitor : public AstNVisitor {
         }
         m_inGenerate = lastInGen;
     }
-    virtual void visit(AstBegin* nodep) {
+    virtual void visit(AstBegin* nodep) VL_OVERRIDE {
         UINFO(5,"   "<<nodep<<endl);
         // Rename "genblk"s to include a number
         if (m_statep->forPrimary() && !nodep->user4SetOnce()) {
@@ -987,7 +987,7 @@ class LinkDotFindVisitor : public AstNVisitor {
         m_beginp = oldbegin;
         m_beginNum = oldNum;
     }
-    virtual void visit(AstNodeFTask* nodep) {
+    virtual void visit(AstNodeFTask* nodep) VL_OVERRIDE {
         // NodeTask: Remember its name for later resolution
         UINFO(5,"   "<<nodep<<endl);
         UASSERT_OBJ(m_curSymp && m_modSymp, nodep, "Function/Task not under module?");
@@ -1023,7 +1023,7 @@ class LinkDotFindVisitor : public AstNVisitor {
         }
         m_curSymp = oldCurSymp;
     }
-    virtual void visit(AstVar* nodep) {
+    virtual void visit(AstVar* nodep) VL_OVERRIDE {
         // Var: Remember its name for later resolution
         UASSERT_OBJ(m_curSymp && m_modSymp, nodep, "Var not under module?");
         iterateChildren(nodep);
@@ -1141,21 +1141,21 @@ class LinkDotFindVisitor : public AstNVisitor {
             }
         }
     }
-    virtual void visit(AstTypedef* nodep) {
+    virtual void visit(AstTypedef* nodep) VL_OVERRIDE {
         UASSERT_OBJ(m_curSymp, nodep, "Typedef not under module/package/$unit");
         iterateChildren(nodep);
         m_statep->insertSym(m_curSymp, nodep->name(), nodep, m_packagep);
     }
-    virtual void visit(AstParamTypeDType* nodep) {
+    virtual void visit(AstParamTypeDType* nodep) VL_OVERRIDE {
         UASSERT_OBJ(m_curSymp, nodep, "Parameter type not under module/package/$unit");
         iterateChildren(nodep);
         m_statep->insertSym(m_curSymp, nodep->name(), nodep, m_packagep);
     }
-    virtual void visit(AstCFunc* nodep) {
+    virtual void visit(AstCFunc* nodep) VL_OVERRIDE {
         // For dotted resolution, ignore all AstVars under functions, otherwise shouldn't exist
         UASSERT_OBJ(!m_statep->forScopeCreation(), nodep, "No CFuncs expected in tree yet");
     }
-    virtual void visit(AstEnumItem* nodep) {
+    virtual void visit(AstEnumItem* nodep) VL_OVERRIDE {
         // EnumItem: Remember its name for later resolution
         iterateChildren(nodep);
         // Find under either a task or the module's vars
@@ -1193,7 +1193,7 @@ class LinkDotFindVisitor : public AstNVisitor {
             m_statep->insertSym(m_curSymp, nodep->name(), nodep, m_packagep);
         }
     }
-    virtual void visit(AstPackageImport* nodep) {
+    virtual void visit(AstPackageImport* nodep) VL_OVERRIDE {
         UINFO(4,"  Link: "<<nodep<<endl);
         VSymEnt* srcp = m_statep->getNodeSym(nodep->packagep());
         if (nodep->name()=="*") {
@@ -1211,7 +1211,7 @@ class LinkDotFindVisitor : public AstNVisitor {
         UINFO(9,"    Link Done: "<<nodep<<endl);
         // No longer needed, but can't delete until any multi-instantiated modules are expanded
     }
-    virtual void visit(AstPackageExport* nodep) {
+    virtual void visit(AstPackageExport* nodep) VL_OVERRIDE {
         UINFO(9,"  Link: "<<nodep<<endl);
         VSymEnt* srcp = m_statep->getNodeSym(nodep->packagep());
         if (nodep->name()!="*") {
@@ -1225,13 +1225,13 @@ class LinkDotFindVisitor : public AstNVisitor {
         UINFO(9,"    Link Done: "<<nodep<<endl);
         // No longer needed, but can't delete until any multi-instantiated modules are expanded
     }
-    virtual void visit(AstPackageExportStarStar* nodep) {
+    virtual void visit(AstPackageExportStarStar* nodep) VL_OVERRIDE {
         UINFO(4,"  Link: "<<nodep<<endl);
         m_curSymp->exportStarStar(m_statep->symsp());
         // No longer needed, but can't delete until any multi-instantiated modules are expanded
     }
 
-    virtual void visit(AstNode* nodep) {
+    virtual void visit(AstNode* nodep) VL_OVERRIDE {
         // Default: Just iterate
         iterateChildren(nodep);
     }
@@ -1296,8 +1296,8 @@ private:
     }
 
     // VISITs
-    virtual void visit(AstTypeTable* nodep) {}
-    virtual void visit(AstNodeModule* nodep) {
+    virtual void visit(AstTypeTable* nodep) VL_OVERRIDE {}
+    virtual void visit(AstNodeModule* nodep) VL_OVERRIDE {
         UINFO(5,"   "<<nodep<<endl);
         if (nodep->dead() || !nodep->user4()) {
             UINFO(4,"Mark dead module "<<nodep<<endl);
@@ -1314,7 +1314,7 @@ private:
             m_modp = NULL;
         }
     }
-    virtual void visit(AstPin* nodep) {
+    virtual void visit(AstPin* nodep) VL_OVERRIDE {
         // Pin: Link to submodule's port
         // Deal with implicit definitions - do before Resolve visitor as may
         // be referenced above declaration
@@ -1323,7 +1323,7 @@ private:
             pinImplicitExprRecurse(nodep->exprp());
         }
     }
-    virtual void visit(AstDefParam* nodep) {
+    virtual void visit(AstDefParam* nodep) VL_OVERRIDE {
         iterateChildren(nodep);
         nodep->v3warn(DEFPARAM, "Suggest replace defparam assignment with Verilog 2001 #(."
                       <<nodep->prettyName()<<"(...etc...))");
@@ -1345,7 +1345,7 @@ private:
             VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
         }
     }
-    virtual void visit(AstPort* nodep) {
+    virtual void visit(AstPort* nodep) VL_OVERRIDE {
         // Port: Stash the pin number
         // Need to set pin numbers after varnames are created
         // But before we do the final resolution based on names
@@ -1372,14 +1372,14 @@ private:
         // Ports not needed any more
         VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
     }
-    virtual void visit(AstAssignW* nodep) {
+    virtual void visit(AstAssignW* nodep) VL_OVERRIDE {
         // Deal with implicit definitions
         // We used to nodep->allowImplicit() here, but it turns out
         // normal "assigns" can also make implicit wires.  Yuk.
         pinImplicitExprRecurse(nodep->lhsp());
         iterateChildren(nodep);
     }
-    virtual void visit(AstAssignAlias* nodep) {
+    virtual void visit(AstAssignAlias* nodep) VL_OVERRIDE {
         // tran gates need implicit creation
         // As VarRefs don't exist in forPrimary, sanity check
         UASSERT_OBJ(!m_statep->forPrimary(), nodep, "Assign aliases unexpected pre-dot");
@@ -1391,13 +1391,13 @@ private:
         }
         iterateChildren(nodep);
     }
-    virtual void visit(AstImplicit* nodep) {
+    virtual void visit(AstImplicit* nodep) VL_OVERRIDE {
         // Unsupported gates need implicit creation
         pinImplicitExprRecurse(nodep);
         // We're done with implicit gates
         VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
     }
-    virtual void visit(AstNode* nodep) {
+    virtual void visit(AstNode* nodep) VL_OVERRIDE {
         // Default: Just iterate
         iterateChildren(nodep);
     }
@@ -1427,11 +1427,11 @@ class LinkDotScopeVisitor : public AstNVisitor {
     int debug() { return LinkDotState::debug(); }
 
     // VISITs
-    virtual void visit(AstNetlist* nodep) {
+    virtual void visit(AstNetlist* nodep) VL_OVERRIDE {
         // Recurse..., backward as must do packages before using packages
         iterateChildrenBackwards(nodep);
     }
-    virtual void visit(AstScope* nodep) {
+    virtual void visit(AstScope* nodep) VL_OVERRIDE {
         UINFO(8,"  SCOPE "<<nodep<<endl);
         UASSERT_OBJ(m_statep->forScopeCreation(), nodep,
                     "Scopes should only exist right after V3Scope");
@@ -1443,7 +1443,7 @@ class LinkDotScopeVisitor : public AstNVisitor {
         m_modSymp = NULL;
         m_scopep = NULL;
     }
-    virtual void visit(AstVarScope* nodep) {
+    virtual void visit(AstVarScope* nodep) VL_OVERRIDE {
         if (!nodep->varp()->isFuncLocal() && !nodep->varp()->isClassMember()) {
             VSymEnt* varSymp = m_statep->insertSym(m_modSymp, nodep->varp()->name(), nodep, NULL);
             if (nodep->varp()->isIfaceRef()
@@ -1477,12 +1477,12 @@ class LinkDotScopeVisitor : public AstNVisitor {
             }
         }
     }
-    virtual void visit(AstNodeFTask* nodep) {
+    virtual void visit(AstNodeFTask* nodep) VL_OVERRIDE {
         VSymEnt* symp = m_statep->insertBlock(m_modSymp, nodep->name(), nodep, NULL);
         symp->fallbackp(m_modSymp);
         // No recursion, we don't want to pick up variables
     }
-    virtual void visit(AstAssignAlias* nodep) {
+    virtual void visit(AstAssignAlias* nodep) VL_OVERRIDE {
         // Track aliases created by V3Inline; if we get a VARXREF(aliased_from)
         // we'll need to replace it with a VARXREF(aliased_to)
         if (debug()>=9) nodep->dumpTree(cout, "-    alias: ");
@@ -1492,7 +1492,7 @@ class LinkDotScopeVisitor : public AstNVisitor {
         fromVscp->user2p(toVscp);
         iterateChildren(nodep);
     }
-    virtual void visit(AstAssignVarScope* nodep) {
+    virtual void visit(AstAssignVarScope* nodep) VL_OVERRIDE {
         UINFO(5,"ASSIGNVARSCOPE  "<<nodep<<endl);
         if (debug()>=9) nodep->dumpTree(cout, "-    avs: ");
         VSymEnt* rhsSymp;
@@ -1544,10 +1544,10 @@ class LinkDotScopeVisitor : public AstNVisitor {
     }
     // For speed, don't recurse things that can't have scope
     // Note we allow AstNodeStmt's as generates may be under them
-    virtual void visit(AstCell*) {}
-    virtual void visit(AstVar*) {}
-    virtual void visit(AstNodeMath*) {}
-    virtual void visit(AstNode* nodep) {
+    virtual void visit(AstCell*) VL_OVERRIDE {}
+    virtual void visit(AstVar*) VL_OVERRIDE {}
+    virtual void visit(AstNodeMath*) VL_OVERRIDE {}
+    virtual void visit(AstNode* nodep) VL_OVERRIDE {
         // Default: Just iterate
         iterateChildren(nodep);
     }
@@ -1577,7 +1577,7 @@ class LinkDotIfaceVisitor : public AstNVisitor {
     int debug() { return LinkDotState::debug(); }
 
     // VISITs
-    virtual void visit(AstModport* nodep) {
+    virtual void visit(AstModport* nodep) VL_OVERRIDE {
         // Modport: Remember its name for later resolution
         UINFO(5,"   fiv: "<<nodep<<endl);
         VSymEnt* oldCurSymp = m_curSymp;
@@ -1589,7 +1589,7 @@ class LinkDotIfaceVisitor : public AstNVisitor {
         }
         m_curSymp = oldCurSymp;
     }
-    virtual void visit(AstModportFTaskRef* nodep) {
+    virtual void visit(AstModportFTaskRef* nodep) VL_OVERRIDE {
         UINFO(5,"   fif: "<<nodep<<endl);
         iterateChildren(nodep);
         if (nodep->isExport()) nodep->v3error("Unsupported: modport export");
@@ -1611,7 +1611,7 @@ class LinkDotIfaceVisitor : public AstNVisitor {
             nodep->unlinkFrBack(); VL_DO_DANGLING(pushDeletep(nodep), nodep);
         }
     }
-    virtual void visit(AstModportVarRef* nodep) {
+    virtual void visit(AstModportVarRef* nodep) VL_OVERRIDE {
         UINFO(5,"   fiv: "<<nodep<<endl);
         iterateChildren(nodep);
         VSymEnt* symp = m_curSymp->findIdFallback(nodep->name());
@@ -1635,7 +1635,7 @@ class LinkDotIfaceVisitor : public AstNVisitor {
             nodep->unlinkFrBack(); VL_DO_DANGLING(pushDeletep(nodep), nodep);
         }
     }
-    virtual void visit(AstNode* nodep) {
+    virtual void visit(AstNode* nodep) VL_OVERRIDE {
         // Default: Just iterate
         iterateChildren(nodep);
     }
@@ -1812,12 +1812,12 @@ private:
     }
 
     // VISITs
-    virtual void visit(AstNetlist* nodep) {
+    virtual void visit(AstNetlist* nodep) VL_OVERRIDE {
         // Recurse..., backward as must do packages before using packages
         iterateChildrenBackwards(nodep);
     }
-    virtual void visit(AstTypeTable* nodep) {}
-    virtual void visit(AstNodeModule* nodep) {
+    virtual void visit(AstTypeTable* nodep) VL_OVERRIDE {}
+    virtual void visit(AstNodeModule* nodep) VL_OVERRIDE {
         if (nodep->dead()) return;
         checkNoDot(nodep);
         UINFO(8,"  "<<nodep<<endl);
@@ -1830,7 +1830,7 @@ private:
         m_modp = NULL;
         m_ds.m_dotSymp = m_curSymp = m_modSymp = NULL;
     }
-    virtual void visit(AstScope* nodep) {
+    virtual void visit(AstScope* nodep) VL_OVERRIDE {
         UINFO(8,"   "<<nodep<<endl);
         VSymEnt* oldModSymp = m_modSymp;
         VSymEnt* oldCurSymp = m_curSymp;
@@ -1841,13 +1841,13 @@ private:
         m_modSymp = oldModSymp;
         m_curSymp = oldCurSymp;
     }
-    virtual void visit(AstCellInline* nodep) {
+    virtual void visit(AstCellInline* nodep) VL_OVERRIDE {
         checkNoDot(nodep);
         if (m_statep->forScopeCreation() && !v3Global.opt.vpi()) {
             nodep->unlinkFrBack(); VL_DO_DANGLING(pushDeletep(nodep), nodep);
         }
     }
-    virtual void visit(AstCell* nodep) {
+    virtual void visit(AstCell* nodep) VL_OVERRIDE {
         // Cell: Recurse inside or cleanup not founds
         checkNoDot(nodep);
         m_cellp = nodep;
@@ -1876,7 +1876,7 @@ private:
         // Parent module inherits child's publicity
         // This is done bottom up in the LinkBotupVisitor stage
     }
-    virtual void visit(AstPin* nodep) {
+    virtual void visit(AstPin* nodep) VL_OVERRIDE {
         // Pin: Link to submodule's port
         checkNoDot(nodep);
         iterateChildren(nodep);
@@ -1918,7 +1918,7 @@ private:
         }
         // Early return() above when deleted
     }
-    virtual void visit(AstDot* nodep) {
+    virtual void visit(AstDot* nodep) VL_OVERRIDE {
         // Legal under a DOT: AstDot, AstParseRef, AstPackageRef, AstNodeSel
         //    also a DOT can be part of an expression, but only above plus
         //    AstFTaskRef are legal children
@@ -1984,7 +1984,7 @@ private:
             m_ds.m_dotp = lastStates.m_dotp;
         }
     }
-    virtual void visit(AstParseRef* nodep) {
+    virtual void visit(AstParseRef* nodep) VL_OVERRIDE {
         if (nodep->user3SetOnce()) return;
         UINFO(9,"   linkPARSEREF "<<m_ds.ascii()<<"  n="<<nodep<<endl);
         // m_curSymp is symbol table of outer expression
@@ -2218,7 +2218,7 @@ private:
             m_ds = lastStates;
         }
     }
-    virtual void visit(AstVarRef* nodep) {
+    virtual void visit(AstVarRef* nodep) VL_OVERRIDE {
         // VarRef: Resolve its reference
         // ParseRefs are used the first pass (forPrimary) so we shouldn't get can't find
         // errors here now that we have a VarRef.
@@ -2237,7 +2237,7 @@ private:
             }
         }
     }
-    virtual void visit(AstVarXRef* nodep) {
+    virtual void visit(AstVarXRef* nodep) VL_OVERRIDE {
         // VarRef: Resolve its reference
         // We always link even if varp() is set, because the module we choose may change
         // due to creating new modules, flattening, etc.
@@ -2311,11 +2311,11 @@ private:
             }
         }
     }
-    virtual void visit(AstEnumItemRef* nodep) {
+    virtual void visit(AstEnumItemRef* nodep) VL_OVERRIDE {
         // EnumItemRef may be under a dot.  Should already be resolved.
         iterateChildren(nodep);
     }
-    virtual void visit(AstMethodCall* nodep) {
+    virtual void visit(AstMethodCall* nodep) VL_OVERRIDE {
         // Created here so should already be resolved.
         DotStates lastStates = m_ds;
         {
@@ -2324,7 +2324,7 @@ private:
         }
         m_ds = lastStates;
     }
-    virtual void visit(AstVar* nodep) {
+    virtual void visit(AstVar* nodep) VL_OVERRIDE {
         checkNoDot(nodep);
         iterateChildren(nodep);
         if (m_statep->forPrimary() && nodep->isIO() && !m_ftaskp && !nodep->user4()) {
@@ -2332,7 +2332,7 @@ private:
                            <<nodep->prettyNameQ());
         }
     }
-    virtual void visit(AstNodeFTaskRef* nodep) {
+    virtual void visit(AstNodeFTaskRef* nodep) VL_OVERRIDE {
         if (nodep->user3SetOnce()) return;
         UINFO(8,"     "<<nodep<<endl);
         if (m_ds.m_dotp && m_ds.m_dotPos == DP_PACKAGE) {
@@ -2446,7 +2446,7 @@ private:
         }
         m_ds = lastStates;
     }
-    virtual void visit(AstSelBit* nodep) {
+    virtual void visit(AstSelBit* nodep) VL_OVERRIDE {
         if (nodep->user3SetOnce()) return;
         iterateAndNextNull(nodep->lhsp());
         if (m_ds.m_dotPos == DP_SCOPE) {  // Already under dot, so this is {modulepart} DOT {modulepart}
@@ -2471,7 +2471,7 @@ private:
             nodep->replaceWith(newp); VL_DO_DANGLING(pushDeletep(nodep), nodep);
         }
     }
-    virtual void visit(AstNodePreSel* nodep) {
+    virtual void visit(AstNodePreSel* nodep) VL_OVERRIDE {
         // Excludes simple AstSelBit, see above
         if (nodep->user3SetOnce()) return;
         if (m_ds.m_dotPos == DP_SCOPE) {  // Already under dot, so this is {modulepart} DOT {modulepart}
@@ -2489,11 +2489,11 @@ private:
         }
         m_ds = lastStates;
     }
-    virtual void visit(AstMemberSel* nodep) {
+    virtual void visit(AstMemberSel* nodep) VL_OVERRIDE {
         // checkNoDot not appropriate, can be under a dot
         iterateChildren(nodep);
     }
-    virtual void visit(AstBegin* nodep) {
+    virtual void visit(AstBegin* nodep) VL_OVERRIDE {
         UINFO(5,"   "<<nodep<<endl);
         checkNoDot(nodep);
         VSymEnt* oldCurSymp = m_curSymp;
@@ -2505,7 +2505,7 @@ private:
         m_ds.m_dotSymp = m_curSymp = oldCurSymp;
         UINFO(5,"   cur=se"<<cvtToHex(m_curSymp)<<endl);
     }
-    virtual void visit(AstNodeFTask* nodep) {
+    virtual void visit(AstNodeFTask* nodep) VL_OVERRIDE {
         UINFO(5,"   "<<nodep<<endl);
         checkNoDot(nodep);
         VSymEnt* oldCurSymp = m_curSymp;
@@ -2517,7 +2517,7 @@ private:
         m_ds.m_dotSymp = m_curSymp = oldCurSymp;
         m_ftaskp = NULL;
     }
-    virtual void visit(AstClass* nodep) {
+    virtual void visit(AstClass* nodep) VL_OVERRIDE {
         UINFO(5,"   "<<nodep<<endl);
         checkNoDot(nodep);
         iterateChildren(nodep);
@@ -2535,7 +2535,7 @@ private:
             }
         }
     }
-    virtual void visit(AstRefDType* nodep) {
+    virtual void visit(AstRefDType* nodep) VL_OVERRIDE {
         // Resolve its reference
         if (nodep->user3SetOnce()) return;
         if (m_ds.m_dotp && m_ds.m_dotPos == DP_PACKAGE) {
@@ -2580,7 +2580,7 @@ private:
         }
         iterateChildren(nodep);
     }
-    virtual void visit(AstDpiExport* nodep) {
+    virtual void visit(AstDpiExport* nodep) VL_OVERRIDE {
         // AstDpiExport: Make sure the function referenced exists, then dump it
         iterateChildren(nodep);
         checkNoDot(nodep);
@@ -2597,35 +2597,35 @@ private:
         }
         VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
     }
-    virtual void visit(AstPackageImport* nodep) {
+    virtual void visit(AstPackageImport* nodep) VL_OVERRIDE {
         // No longer needed
         checkNoDot(nodep);
         VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
     }
-    virtual void visit(AstPackageExport* nodep) {
+    virtual void visit(AstPackageExport* nodep) VL_OVERRIDE {
         // No longer needed
         checkNoDot(nodep);
         VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
     }
-    virtual void visit(AstPackageExportStarStar* nodep) {
+    virtual void visit(AstPackageExportStarStar* nodep) VL_OVERRIDE {
         // No longer needed
         checkNoDot(nodep);
         VL_DO_DANGLING(nodep->unlinkFrBack()->deleteTree(), nodep);
     }
-    virtual void visit(AstCellRef* nodep) {
+    virtual void visit(AstCellRef* nodep) VL_OVERRIDE {
         UINFO(5,"  AstCellRef: "<<nodep<<" "<<m_ds.ascii()<<endl);
         iterateChildren(nodep);
     }
-    virtual void visit(AstCellArrayRef* nodep) {
+    virtual void visit(AstCellArrayRef* nodep) VL_OVERRIDE {
         UINFO(5,"  AstCellArrayRef: "<<nodep<<" "<<m_ds.ascii()<<endl);
         // Expression already iterated
     }
-    virtual void visit(AstUnlinkedRef* nodep) {
+    virtual void visit(AstUnlinkedRef* nodep) VL_OVERRIDE {
         UINFO(5,"  AstCellArrayRef: "<<nodep<<" "<<m_ds.ascii()<<endl);
         // No need to iterate, if we have a UnlinkedVarXRef, we're already done
     }
 
-    virtual void visit(AstNode* nodep) {
+    virtual void visit(AstNode* nodep) VL_OVERRIDE {
         // Default: Just iterate
         checkNoDot(nodep);
         iterateChildren(nodep);

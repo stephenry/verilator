@@ -43,7 +43,7 @@ private:
     // METHODS
     VL_DEBUG_FUNC;  // Declare debug()
 
-    virtual void visit(AstClass* nodep) {
+    virtual void visit(AstClass* nodep) VL_OVERRIDE {
         if (nodep->user1SetOnce()) return;
         string prevPrefix = m_prefix;
         {
@@ -56,7 +56,7 @@ private:
         nodep->unlinkFrBack();
         v3Global.rootp()->addModulep(nodep);
     }
-    virtual void visit(AstPackage* nodep) {
+    virtual void visit(AstPackage* nodep) VL_OVERRIDE {
         string prevPrefix = m_prefix;
         {
             m_prefix = nodep->name() + "__03a__03a";  // ::
@@ -65,8 +65,8 @@ private:
         m_prefix = prevPrefix;
     }
 
-    virtual void visit(AstNodeMath* nodep) {}  // Short circuit
-    virtual void visit(AstNode* nodep) { iterateChildren(nodep); }
+    virtual void visit(AstNodeMath* nodep) VL_OVERRIDE {}  // Short circuit
+    virtual void visit(AstNode* nodep) VL_OVERRIDE { iterateChildren(nodep); }
 
 public:
     // CONSTRUCTORS
