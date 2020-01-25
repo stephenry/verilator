@@ -104,8 +104,8 @@ private:
         //
         // V3Combine wouldn't likely be able to combine top-level
         // routines anyway, so there's no harm in keeping these static.
-        if (m_modp && m_modp->isTop()) relativeRefOk = false;
-        //
+        UASSERT_OBJ(m_modp, scopep, "Scope not under module");
+        if (m_modp->isTop()) relativeRefOk = false;
         //
         // Use absolute refs if this scope is the only instance of the module.
         // Saves a bit of overhead on passing the 'this' pointer, and there's no

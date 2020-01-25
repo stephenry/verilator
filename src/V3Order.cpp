@@ -1038,7 +1038,8 @@ private:
     }
     virtual void visit(AstVarScope* nodep) VL_OVERRIDE {
         // Create links to all input signals
-        if (m_modp && m_modp->isTop() && nodep->varp()->isNonOutput()) {
+        UASSERT_OBJ(m_modp, nodep, "Scope not under module");
+        if (m_modp->isTop() && nodep->varp()->isNonOutput()) {
             OrderVarVertex* varVxp = newVarUserVertex(nodep, WV_STD);
             new OrderEdge(&m_graph, m_inputsVxp, varVxp, WEIGHT_INPUT);
         }
@@ -1464,7 +1465,7 @@ void OrderVisitor::processCircular() {
             for (V3GraphEdge* edgep = vvertexp->outBeginp(); edgep; edgep=edgep->outNextp()) {
                 if (edgep->weight()==0) {  // was cut
                     OrderEdge* oedgep = dynamic_cast<OrderEdge*>(edgep);
-                    UASSERT_OBJ(oedgep, vvertexp->varScp(), "Cuttable edge not of proper type");
+                    UASSERT_OBJ(oedgep, vvertexp->varScp(), "Cutable edge not of proper type");
                     UINFO(6,"      CutCircularO: "<<vvertexp->name()<<endl);
                     nodeMarkCircular(vvertexp, oedgep);
                 }
@@ -1472,7 +1473,7 @@ void OrderVisitor::processCircular() {
             for (V3GraphEdge* edgep = vvertexp->inBeginp(); edgep; edgep = edgep->inNextp()) {
                 if (edgep->weight()==0) {  // was cut
                     OrderEdge* oedgep = dynamic_cast<OrderEdge*>(edgep);
-                    UASSERT_OBJ(oedgep, vvertexp->varScp(), "Cuttable edge not of proper type");
+                    UASSERT_OBJ(oedgep, vvertexp->varScp(), "Cutable edge not of proper type");
                     UINFO(6,"      CutCircularI: "<<vvertexp->name()<<endl);
                     nodeMarkCircular(vvertexp, oedgep);
                 }

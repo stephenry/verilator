@@ -6390,24 +6390,31 @@ public:
 //======================================================================
 // Text based nodes
 
-class AstText : public AstNodeText {
+class AstNodeSimpleText : public AstNodeText {
 private:
     bool m_tracking;  // When emit, it's ok to parse the string to do indentation
 public:
-    AstText(FileLine* fl, const string& textp, bool tracking=false)
+    AstNodeSimpleText(FileLine* fl, const string& textp, bool tracking=false)
         : AstNodeText(fl, textp), m_tracking(tracking) {}
-    ASTNODE_NODE_FUNCS(Text)
+    ASTNODE_BASE_FUNCS(NodeSimpleText)
     void tracking(bool flag) { m_tracking = flag; }
     bool tracking() const { return m_tracking; }
 };
 
-class AstTextBlock : public AstText {
+class AstText : public AstNodeSimpleText {
+public:
+    AstText(FileLine* fl, const string& textp, bool tracking=false)
+        : AstNodeSimpleText(fl, textp, tracking) {}
+    ASTNODE_NODE_FUNCS(Text)
+};
+
+class AstTextBlock : public AstNodeSimpleText {
 private:
     bool m_commas;  // Comma separate emitted children
 public:
     AstTextBlock(FileLine* fl, const string& textp="", bool tracking=false,
                  bool commas=false)
-        : AstText(fl, textp, tracking), m_commas(commas) {}
+        : AstNodeSimpleText(fl, textp, tracking), m_commas(commas) {}
     ASTNODE_NODE_FUNCS(TextBlock)
     void commas(bool flag) { m_commas = flag; }
     bool commas() const { return m_commas; }
@@ -6492,18 +6499,18 @@ public:
 //======================================================================
 // Emitted file nodes
 
-class AstFile : public AstNode {
+class AstNodeFile : public AstNode {
     // Emitted Otput file
     // Parents:  NETLIST
     // Children: AstTextBlock
 private:
     string      m_name;         ///< Filename
 public:
-    AstFile(FileLine* fl, const string& name)
+    AstNodeFile(FileLine* fl, const string& name)
         : AstNode(fl) {
         m_name = name;
     }
-    ASTNODE_BASE_FUNCS(File)
+    ASTNODE_BASE_FUNCS(NodeFile)
     virtual string name() const { return m_name; }
     virtual V3Hash sameHash() const { return V3Hash(); }
     virtual bool same(const AstNode* samep) const { return true; }
@@ -6514,12 +6521,12 @@ public:
 //======================================================================
 // Emit V nodes
 
-class AstVFile : public AstFile {
+class AstVFile : public AstNodeFile {
     // Verilog output file
     // Parents:  NETLIST
 public:
     AstVFile(FileLine* fl, const string& name)
-        : AstFile(fl, name) { }
+        : AstNodeFile(fl, name) { }
     ASTNODE_NODE_FUNCS(VFile)
     virtual void dump(std::ostream& str=std::cout) const;
 };
@@ -6527,7 +6534,7 @@ public:
 //======================================================================
 // Emit C nodes
 
-class AstCFile : public AstFile {
+class AstCFile : public AstNodeFile {
     // C++ output file
     // Parents:  NETLIST
 private:
@@ -6536,7 +6543,7 @@ private:
     bool        m_support:1;    ///< Support file (non systemc)
 public:
     AstCFile(FileLine* fl, const string& name)
-        : AstFile(fl, name) {
+        : AstNodeFile(fl, name) {
         m_slow = false;
         m_source = false;
         m_support = false;
@@ -6894,8 +6901,8 @@ public:
     AstNodeModule* topModulep() const {  // * = Top module in hierarchy (first one added, for now)
         return VN_CAST(op1p(), NodeModule); }
     void addModulep(AstNodeModule* modulep) { addOp1p(modulep); }
-    AstFile* filesp() const { return VN_CAST(op2p(), File);}  // op2 = List of files
-    void addFilesp(AstFile* filep) { addOp2p(filep); }
+    AstNodeFile* filesp() const { return VN_CAST(op2p(), NodeFile); }  // op2 = List of files
+    void addFilesp(AstNodeFile* filep) { addOp2p(filep); }
     AstNode* miscsp() const { return op3p(); }  // op3 = List of dtypes etc
     void addMiscsp(AstNode* nodep) { addOp3p(nodep); }
     AstTypeTable* typeTablep() { return m_typeTablep; }
