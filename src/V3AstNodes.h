@@ -450,6 +450,7 @@ public:
         const AstAssocArrayDType* asamep = static_cast<const AstAssocArrayDType*>(samep);
         return (subDTypep()->skipRefp()->similarDType(asamep->subDTypep()->skipRefp()));
     }
+    virtual string prettyDTypeName() const;
     virtual void dumpSmall(std::ostream& str) const;
     virtual V3Hash sameHash() const { return V3Hash(m_refDTypep); }
     AstNodeDType* getChildDTypep() const { return childDTypep(); }
@@ -498,6 +499,7 @@ public:
         widthForce(width, width);
     }
     ASTNODE_NODE_FUNCS(PackArrayDType)
+    virtual string prettyDTypeName() const;
 };
 
 class AstUnpackArrayDType : public AstNodeArrayDType {
@@ -525,6 +527,7 @@ public:
         widthFromSub(subDTypep());
     }
     ASTNODE_NODE_FUNCS(UnpackArrayDType)
+    virtual string prettyDTypeName() const;
 };
 
 class AstUnsizedArrayDType : public AstNodeDType {
@@ -648,6 +651,7 @@ public:
     virtual bool similarDType(AstNodeDType* samep) const {
         return type()==samep->type() && same(samep); }
     virtual string name() const { return m.m_keyword.ascii(); }
+    virtual string prettyDTypeName() const;
     virtual const char* broken() const { BROKEN_RTN(dtypep()!=this); return NULL; }
     AstRange* rangep() const { return VN_CAST(op1p(), Range); }  // op1 = Range of variable
     void rangep(AstRange* nodep) { setNOp1p(nodep); }
@@ -854,6 +858,7 @@ public:
     }
     virtual void dumpSmall(std::ostream& str) const;
     virtual V3Hash sameHash() const { return V3Hash(m_refDTypep); }
+    virtual string prettyDTypeName() const;
     AstNodeDType* getChildDTypep() const { return childDTypep(); }
     AstNodeDType* childDTypep() const { return VN_CAST(op1p(), NodeDType); }  // op1 = Range of variable
     void childDTypep(AstNodeDType* nodep) { setOp1p(nodep); }
@@ -886,6 +891,11 @@ public:
         dtypeFrom(defp->dtypep());
         widthFromSub(subDTypep());
     }
+    class FlagTypeOfExpr {};  // type(expr) for parser only
+    AstRefDType(FileLine* fl, FlagTypeOfExpr, AstNode* typeofp)
+        : ASTGEN_SUPER(fl), m_refDTypep(NULL), m_packagep(NULL) {
+        setOp2p(typeofp);
+    }
     ASTNODE_NODE_FUNCS(RefDType)
     // METHODS
     virtual const char* broken() const { BROKEN_RTN(m_refDTypep && !m_refDTypep->brokeExists()); return NULL; }
@@ -902,6 +912,8 @@ public:
     virtual V3Hash sameHash() const { return V3Hash(V3Hash(m_refDTypep), V3Hash(m_packagep)); }
     virtual void dump(std::ostream& str=std::cout) const;
     virtual string name() const { return m_name; }
+    virtual string prettyDTypeName() const {
+        return subDTypep() ? subDTypep()->name() : prettyName(); }
     virtual AstBasicDType* basicp() const { return subDTypep() ? subDTypep()->basicp() : NULL; }
     virtual AstNodeDType* skipRefp() const {
         // Skip past both the Ref and the Typedef
@@ -928,6 +940,7 @@ public:
     virtual AstNodeDType* subDTypep() const { return m_refDTypep; }
     AstPackage* packagep() const { return m_packagep; }
     void packagep(AstPackage* nodep) { m_packagep = nodep; }
+    AstNode* typeofp() const { return op2p(); }
 };
 
 class AstStructDType : public AstNodeUOrStructDType {
@@ -6210,6 +6223,29 @@ public:
     virtual bool sizeMattersRhs() const { return false; }
 };
 
+class AstGetcRefN : public AstNodeBiop {
+    // Verilog string[#] on the left-hand-side of assignment
+    // Spec says is of type byte (not string of single character)
+public:
+    AstGetcRefN(FileLine* fl, AstNode* lhsp, AstNode* rhsp)
+        : ASTGEN_SUPER(fl, lhsp, rhsp) { dtypeSetBitSized(8, AstNumeric::UNSIGNED); }
+    ASTNODE_NODE_FUNCS(GetcRefN)
+    virtual AstNode* cloneType(AstNode* lhsp, AstNode* rhsp) {
+        return new AstGetcRefN(this->fileline(), lhsp, rhsp);
+    }
+    virtual void numberOperate(V3Number& out, const V3Number& lhs, const V3Number& rhs) {
+        V3ERROR_NA;
+    }
+    virtual string emitVerilog() { return "%k%l[%r]"; }
+    virtual string emitC() { V3ERROR_NA; }
+    virtual string emitSimpleOperator() { return ""; }
+    virtual bool cleanOut() const { return true; }
+    virtual bool cleanLhs() const { return true; }
+    virtual bool cleanRhs() const { return true; }
+    virtual bool sizeMattersLhs() const { return false; }
+    virtual bool sizeMattersRhs() const { return false; }
+};
+
 class AstSubstrN : public AstNodeTriop {
     // Verilog string.substr()
 public:
@@ -6283,6 +6319,24 @@ public:
     AstNode* ticksp() const { return op2p(); }  // op2 = ticks or NULL means 1
     AstSenTree* sentreep() const { return VN_CAST(op4p(), SenTree); }  // op4 = clock domain
     void sentreep(AstSenTree* sentreep) { addOp4p(sentreep); }  // op4 = clock domain
+    virtual V3Hash sameHash() const { return V3Hash(); }
+    virtual bool same(const AstNode* samep) const { return true; }
+};
+
+class AstSampled : public AstNodeMath {
+    // Verilog $sampled
+    // Parents: math
+    // Children: expression
+public:
+    AstSampled(FileLine* fl, AstNode* exprp)
+        : ASTGEN_SUPER(fl) { addOp1p(exprp); }
+    ASTNODE_NODE_FUNCS(Sampled)
+    virtual string emitVerilog() { return "$sampled(%l)"; }
+    virtual string emitC() { V3ERROR_NA; return "";}
+    virtual string emitSimpleOperator() { V3ERROR_NA; return ""; }
+    virtual bool cleanOut() const { V3ERROR_NA; return ""; }
+    virtual int instrCount() const { return 0; }
+    AstNode* exprp() const { return op1p(); }  // op1 = expression
     virtual V3Hash sameHash() const { return V3Hash(); }
     virtual bool same(const AstNode* samep) const { return true; }
 };

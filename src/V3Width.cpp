@@ -355,6 +355,16 @@ private:
             nodep->dtypeSetBitSized(8, AstNumeric::UNSIGNED);
         }
     }
+    virtual void visit(AstGetcRefN* nodep) VL_OVERRIDE {
+        // CALLER: str.getc()
+        UASSERT_OBJ(nodep->rhsp(), nodep, "For binary ops only!");
+        if (m_vup && m_vup->prelim()) {
+            // See similar handling in visit_cmp_eq_gt where created
+            iterateCheckString(nodep, "LHS", nodep->lhsp(), BOTH);
+            iterateCheckSigned32(nodep, "RHS", nodep->rhsp(), BOTH);
+            nodep->dtypeSetBitSized(8, AstNumeric::UNSIGNED);
+        }
+    }
     virtual void visit(AstSubstrN* nodep) VL_OVERRIDE {
         // CALLER: str.substr()
         UASSERT_OBJ(nodep->rhsp() && nodep->thsp(), nodep, "For ternary ops only!");
@@ -449,7 +459,8 @@ private:
             if (vdtypep && (VN_IS(vdtypep, AssocArrayDType)
                             || VN_IS(vdtypep, AssocArrayDType)
                             || VN_IS(vdtypep, QueueDType))) {
-                nodep->v3error("Unsupported: Concatenation to form "<<vdtypep->prettyTypeName());
+                nodep->v3error("Unsupported: Concatenation to form "
+                               << vdtypep->prettyDTypeNameQ() << "data type");
             }
 
             iterateCheckSizedSelf(nodep, "LHS", nodep->lhsp(), SELF, BOTH);
@@ -524,10 +535,11 @@ private:
         //   width: value(LHS) * width(RHS)
         if (m_vup->prelim()) {
             AstNodeDType* vdtypep = m_vup->dtypeNullp();
-            if (vdtypep && (VN_IS(vdtypep, AssocArrayDType)
-                            || VN_IS(vdtypep, QueueDType)
-                            || VN_IS(vdtypep, UnpackArrayDType))) {
-                nodep->v3error("Unsupported: Replication to form "<<vdtypep->prettyTypeName());
+            if (vdtypep
+                && (VN_IS(vdtypep, AssocArrayDType) || VN_IS(vdtypep, QueueDType)
+                    || VN_IS(vdtypep, UnpackArrayDType))) {
+                nodep->v3error("Unsupported: Replication to form " << vdtypep->prettyDTypeNameQ()
+                               << " data type");
             }
             iterateCheckSizedSelf(nodep, "LHS", nodep->lhsp(), SELF, BOTH);
             iterateCheckSizedSelf(nodep, "RHS", nodep->rhsp(), SELF, BOTH);
@@ -945,6 +957,12 @@ private:
             }
         }
     }
+    virtual void visit(AstSampled* nodep) VL_OVERRIDE {
+        if (m_vup->prelim()) {
+            iterateCheckSizedSelf(nodep, "LHS", nodep->exprp(), SELF, BOTH);
+            nodep->dtypeFrom(nodep->exprp());
+        }
+    }
     virtual void visit(AstRand* nodep) VL_OVERRIDE {
         if (m_vup->prelim()) {
             nodep->dtypeSetSigned32();  // Says the spec
@@ -1148,6 +1166,13 @@ private:
             }
             break;
         }
+        case AstAttrType::TYPENAME: {
+            UASSERT_OBJ(nodep->fromp(), nodep, "Unprovided expression");
+            string result = nodep->fromp()->dtypep()->prettyDTypeName();
+            AstNode* newp = new AstConst(nodep->fileline(), AstConst::String(), result);
+            nodep->replaceWith(newp); VL_DO_DANGLING(nodep->deleteTree(), nodep);
+            break;
+        }
         default: {
             // Everything else resolved earlier
             nodep->dtypeSetLogicUnsized(32, 1, AstNumeric::UNSIGNED);  // Approximation, unsized 32
@@ -1261,6 +1286,15 @@ private:
         }
         if (nodep->didWidthAndSet()) return;  // This node is a dtype & not both PRELIMed+FINALed
         nodep->doingWidth(true);
+        if (nodep->typeofp()) {  // type(typeofp_expression)
+            // Type comes from expression's type
+            userIterateAndNext(nodep->typeofp(), WidthVP(SELF, BOTH).p());
+            AstNode* typeofp = nodep->typeofp();
+            nodep->refDTypep(typeofp->dtypep());
+            VL_DO_DANGLING(typeofp->unlinkFrBack()->deleteTree(), typeofp);
+            // We had to use AstRefDType for this construct as pointers to this type
+            // in type table are still correct (which they wouldn't be if we replaced the node)
+        }
         userIterateChildren(nodep, NULL);
         if (nodep->subDTypep()) nodep->refDTypep(iterateEditDTypep(nodep, nodep->subDTypep()));
         // Effectively nodep->dtypeFrom(nodep->dtypeSkipRefp());
@@ -2374,9 +2408,10 @@ private:
                     patp->unlinkFrBack(&relinkHandle);
                     while (AstNode* movep = patp->lhssp()->nextp()) {
                         movep->unlinkFrBack();  // Not unlinkFrBackWithNext, just one
+                        AstNode* newkeyp = NULL;
+                        if (patp->keyp()) newkeyp = patp->keyp()->cloneTree(true);
                         AstPatMember* newp
-                            = new AstPatMember(patp->fileline(), movep,
-                                               patp->keyp()->cloneTree(true), NULL);
+                            = new AstPatMember(patp->fileline(), movep, newkeyp, NULL);
                         patp->addNext(newp);
                     }
                     relinkHandle.relink(patp);
@@ -2404,8 +2439,8 @@ private:
                      && VN_CAST(dtypep, BasicDType)->isRanged()) {
                 VL_DO_DANGLING(patternBasic(nodep, dtypep, defaultp), nodep);
             } else {
-                nodep->v3error("Unsupported: Assignment pattern applies against non struct/union: "
-                               <<dtypep->prettyTypeName());
+                nodep->v3error("Unsupported: Assignment pattern applies against non struct/union data type: "
+                               << dtypep->prettyDTypeNameQ());
             }
         }
     }
@@ -3117,9 +3152,9 @@ private:
                 if (nodep->modVarp()->direction() == VDirection::REF) {
                     nodep->v3error("Ref connection "<<nodep->modVarp()->prettyNameQ()
                                    <<" requires matching types;"
-                                   <<" ref requires "<<pinDTypep->prettyTypeName()
-                                   <<" but connection is "
-                                   <<conDTypep->prettyTypeName()<<"."<<endl);
+                                   <<" ref requires "<<pinDTypep->prettyDTypeNameQ()
+                                   <<" data type but connection is "
+                                   <<conDTypep->prettyDTypeNameQ()<<" data type."<<endl);
                 } else if (nodep->modVarp()->isTristate()) {
                     if (pinwidth != conwidth) {
                         nodep->v3error("Unsupported: "<<ucfirst(nodep->prettyOperatorName())
@@ -4261,7 +4296,7 @@ private:
     AstNode* spliceCvtD(AstNode* nodep) {
         // For integer used in REAL context, convert to real
         // We don't warn here, "2.0 * 2" is common and reasonable
-        if (nodep && !nodep->isDouble()) {
+        if (nodep && !nodep->dtypep()->skipRefp()->isDouble()) {
             UINFO(6,"   spliceCvtD: "<<nodep<<endl);
             AstNRelinker linker;
             nodep->unlinkFrBack(&linker);
@@ -4275,7 +4310,7 @@ private:
     AstNode* spliceCvtS(AstNode* nodep, bool warnOn) {
         // IEEE-2012 11.8.1: Signed: Type coercion creates signed
         // 11.8.2: Argument to convert is self-determined
-        if (nodep && nodep->isDouble()) {
+        if (nodep && nodep->dtypep()->skipRefp()->isDouble()) {
             UINFO(6,"   spliceCvtS: "<<nodep<<endl);
             AstNRelinker linker;
             nodep->unlinkFrBack(&linker);

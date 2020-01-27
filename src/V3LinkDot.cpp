@@ -2549,7 +2549,8 @@ private:
         } else {
             checkNoDot(nodep);
         }
-        if (!nodep->defp()) {
+        if (nodep->typeofp()) {  // Really is a typeof not a reference
+        } else if (!nodep->defp()) {
             VSymEnt* foundp;
             if (nodep->packagep()) {
                 foundp = m_statep->getNodeSym(nodep->packagep())->findIdFlat(nodep->name());
