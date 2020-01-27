@@ -303,8 +303,9 @@ public:
     }
     virtual void visit(AstNodeCCall* nodep) VL_OVERRIDE {
         if (AstCMethodCall* ccallp = VN_CAST(nodep, CMethodCall)) {
+            // make this a Ast type for future opt
             iterate(ccallp->fromp());
-            puts("->");
+            putbs("->");
         } else {
             puts(nodep->hiernameProtect());
         }
@@ -786,9 +787,23 @@ public:
         putbs("->");
         puts(nodep->varp()->nameProtect());
     }
+    virtual void visit(AstNullCheck* nodep) VL_OVERRIDE {
+        puts("VL_NULL_CHECK(");
+        iterateAndNextNull(nodep->lhsp());
+        puts(", ");
+        putsQuoted(protect(nodep->fileline()->filename()));
+        puts(", ");
+        puts(cvtToStr(nodep->fileline()->lineno()));
+        puts(")");
+    }
     virtual void visit(AstNew* nodep) VL_OVERRIDE {
-        puts("std::make_shared<" + nodep->dtypep()->nameProtect() + ">(");
-        iterateChildren(nodep);
+        puts("std::make_shared<" + prefixNameProtect(nodep->dtypep()) + ">(");
+        if (nodep->rhsp()) {  // Copy
+            puts("*");  // i.e. make into a reference
+            iterateAndNextNull(nodep->rhsp());
+        } else {  // Construct
+            iterateAndNextNull(nodep->argsp());
+        }
         puts(")");
     }
     virtual void visit(AstSel* nodep) VL_OVERRIDE {
@@ -1495,10 +1510,10 @@ class EmitCImp : EmitCStmts {
 
     void emitClassImp(AstClass* nodep) {
         // FIXME elsehwere make AstCFunc and inside use AstText or something
-        puts("std::string " + nodep->nameProtect() + "::to_string() const {\n");
+        puts("std::string " + prefixNameProtect(nodep) + "::to_string() const {\n");
         puts(  "return std::string(\"`{\") + to_string_middle() + \"}\";\n");
         puts("}\n");
-        puts("std::string " + nodep->nameProtect() + "::to_string_middle() const {\n");
+        puts("std::string " + prefixNameProtect(nodep) + "::to_string_middle() const {\n");
         puts(  "std::string out;\n");
         std::string comma;
         for (AstNode* itemp = nodep->membersp(); itemp; itemp = itemp->nextp()) {
@@ -1523,7 +1538,8 @@ class EmitCImp : EmitCStmts {
         }
         puts(  "return out;\n");
         puts("}\n");
-        puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj) {\n");
+        puts("std::string VL_TO_STRING(const VlClassRef<" + prefixNameProtect(nodep)
+             + ">& obj) {\n");
         puts(  "return (obj ? obj->to_string() : \"null\");\n");
         puts("}\n");
     }
@@ -2004,7 +2020,9 @@ void EmitCImp::emitMTaskVertexCtors(bool* firstp) {
 void EmitCImp::emitCtorImp(AstNodeModule* modp) {
     puts("\n");
     bool first = true;
-    if (optSystemC() && modp->isTop()) {
+    if (VN_IS(modp, Class)) {
+        puts(prefixNameProtect(modp) + "::" + prefixNameProtect(modp) + "()");
+    } else if (optSystemC() && modp->isTop()) {
         puts("VL_SC_CTOR_IMP(" + prefixNameProtect(modp) + ")");
     } else {
         puts("VL_CTOR_IMP(" + prefixNameProtect(modp) + ")");
@@ -2853,7 +2871,7 @@ void EmitCImp::emitImp(AstNodeModule* modp) {
 
         puts("\n//--------------------\n");
         emitCtorImp(modp);
-        emitConfigureImp(modp);
+        if (!VN_IS(modp, Class)) emitConfigureImp(modp);
         emitDestructorImp(modp);
         if (AstClass* classp = VN_CAST(modp, Class)) emitClassImp(classp);
         emitSavableImp(modp);
@@ -2913,6 +2931,15 @@ void EmitCImp::main(AstNodeModule* modp, bool slow, bool fast) {
     emitImpTop(fileModp);
     emitImp(modp);
 
+    if (AstClassPackage* packagep = VN_CAST(modp, ClassPackage)) {
+        // Put the non-static class implementation in same C++ files as
+        // often optimizations are possible when both are seen by the
+        // compiler together
+        m_modp = packagep->classp();
+        emitImp(packagep->classp());
+        m_modp = modp;
+    }
+
     if (fast && modp->isTop() && v3Global.opt.mtasks()) {
         // Make a final pass and emit function definitions for the mtasks
         // in the ExecGraph
@@ -2941,10 +2968,13 @@ class EmitCClassesInt : EmitCStmts {
     virtual void visit(AstClass* nodep) VL_OVERRIDE {
         ofp()->resetPrivate();
         puts("\n");
-        puts("class " + nodep->nameProtect());
+        puts("class " + prefixNameProtect(nodep));
         if (nodep->extendsp()) puts(" : public " + nodep->extendsp()->classp()->nameProtect());
         puts(" {\n");
         ofp()->putsPrivate(false);
+        puts("// CONSTRUCTORS\n");
+        puts(prefixNameProtect(nodep) + "();\n");
+        puts("~" + prefixNameProtect(nodep) + "();\n");
         if (nodep->membersp()) {
             puts("// MEMBERS\n");
             emitVarList(nodep->membersp(), EVL_FUNC_ALL, "");
@@ -2958,7 +2988,7 @@ class EmitCClassesInt : EmitCStmts {
         puts(  "std::string to_string_middle() const;\n");
 
         puts("};\n");
-        puts("std::string VL_TO_STRING(const VlClassRef<" + nodep->nameProtect() + ">& obj);\n");
+        puts("std::string VL_TO_STRING(const VlClassRef<" + prefixNameProtect(nodep) + ">& obj);\n");
     }
 public:
     explicit EmitCClassesInt() {}
@@ -3400,7 +3430,8 @@ void V3EmitC::emitc() {
     // Process each module in turn
     for (AstNodeModule* nodep = v3Global.rootp()->modulesp();
          nodep; nodep = VN_CAST(nodep->nextp(), NodeModule)) {
-        if (v3Global.opt.outputSplit()) {
+        if (VN_IS(nodep, Class)) {  // Imped with ClassPackage
+        } else if (v3Global.opt.outputSplit()) {
             { EmitCImp fast; fast.main(nodep, false, true); }
             { EmitCImp slow; slow.main(nodep, true, false); }
         } else {

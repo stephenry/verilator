@@ -2874,15 +2874,14 @@ finc_or_dec_expression<nodep>:	// ==IEEE: inc_or_dec_expression
 
 class_new<nodep>:		// ==IEEE: class_new
 	//			// Special precence so (...) doesn't match expr
-		yNEW__ETC				{ $$ = new AstNew($1); }
-	|	yNEW__ETC expr				{ $$ = new AstNew($1); BBUNSUP($1, "Unsupported: new with expression"); }
-	//			// Grammer abiguity; we assume "new (x)" the () are a argument, not expr
-	|	yNEW__PAREN '(' list_of_argumentsE ')'	{ $$ = new AstNew($1); BBUNSUP($1, "Unsupported: new with arguments"); }
+		yNEW__ETC				{ $$ = new AstNew($1, NULL, NULL); }
+	|	yNEW__ETC expr				{ $$ = new AstNew($1, $2, NULL); }
+	|	yNEW__PAREN '(' list_of_argumentsE ')'	{ $$ = new AstNew($1, NULL, $3); }
 	;
 
 dynamic_array_new<nodep>:	// ==IEEE: dynamic_array_new
-		yNEW__ETC '[' expr ']'			{ $$ = new AstNew($1); BBUNSUP($1, "Unsupported: Dynamic array new"); }
-	|	yNEW__ETC '[' expr ']' '(' expr ')'	{ $$ = new AstNew($1); BBUNSUP($1, "Unsupported: Dynamic array new"); }
+		yNEW__ETC '[' expr ']'			{ $$ = new AstNew($1, NULL, NULL); BBUNSUP($1, "Unsupported: Dynamic array new"); }
+	|	yNEW__ETC '[' expr ']' '(' expr ')'	{ $$ = new AstNew($1, NULL, $6); BBUNSUP($1, "Unsupported: Dynamic array new"); }
 	;
 
 //************************************************
@@ -3428,11 +3427,9 @@ funcId<ftaskp>:			// IEEE: function_data_type_or_implicit + part of function_bod
 funcIdNew<ftaskp>:		// IEEE: from class_constructor_declaration
 		yNEW__ETC
 			{ $$ = new AstFunc($<fl>1, "new", NULL, NULL);
-			  BBUNSUP($<fl>1, "Unsupported: new constructor");
 			  SYMP->pushNewUnder($$, NULL); }
 	| 	yNEW__PAREN
 			{ $$ = new AstFunc($<fl>1, "new", NULL, NULL);
-			  BBUNSUP($<fl>1, "Unsupported: new constructor");
 			  SYMP->pushNewUnder($$, NULL); }
 	|	class_scopeWithoutId yNEW__PAREN
 			{ $$ = new AstFunc($<fl>2, "new", NULL, NULL);
@@ -5505,8 +5502,8 @@ class_method<nodep>:		// ==IEEE: class_method
 
 class_item_qualifier<nodep>:	// IEEE: class_item_qualifier minus ySTATIC
 	//			// IMPORTANT: yPROTECTED | yLOCAL is in a lex rule
-		yPROTECTED				{ $$ = NULL; }  // Ignoring protected until implemented
-	|	yLOCAL__ETC				{ $$ = NULL; BBUNSUP($1, "Unsupported: 'local' class item"); }
+		yPROTECTED				{ $$ = NULL; }  // Ignoring protected until warning implemented
+	|	yLOCAL__ETC				{ $$ = NULL; }  // Ignoring local until warning implemented
 	|	ySTATIC__ETC				{ $$ = NULL; BBUNSUP($1, "Unsupported: 'static' class item"); }
 	;
 

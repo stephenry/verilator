@@ -105,7 +105,8 @@ private:
     }
     virtual void visit(AstCell* nodep) VL_OVERRIDE {
         if (!nodep->user1()) {
-            rename(nodep, !nodep->modp()->modPublic());
+            rename(nodep, (!nodep->modp()->modPublic()
+                           && !VN_IS(nodep->modp(), ClassPackage)));
             iterateChildren(nodep);
         }
     }
@@ -128,8 +129,8 @@ private:
             // Always recompute name (as many levels above scope may have changed)
             // Same formula as V3Scope
             nodep->name(nodep->isTop() ? "TOP"
-                        : VN_IS(m_modp, Class)
-                        ? (nodep->aboveScopep()->name() + "." + m_modp->name())
+                        : VN_IS(m_modp, Class) ? ("TOP." + m_modp->name())
+                        : VN_IS(m_modp, ClassPackage) ? ("TOP." + m_modp->name())
                         : (nodep->aboveScopep()->name() + "." + nodep->aboveCellp()->name()));
             nodep->editCountInc();
             iterateChildren(nodep);

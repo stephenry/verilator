@@ -26,6 +26,7 @@
 #include "V3Global.h"
 #include "V3Graph.h"
 #include "V3PartitionGraph.h"  // Just for mtask dumping
+#include "V3EmitCBase.h"
 
 #include <cstdarg>
 #include <iomanip>
@@ -313,7 +314,7 @@ AstVar::VlArgTypeRecursed AstVar::vlArgTypeRecurse(bool forFunc, const AstNodeDT
         return info;
     } else if (const AstClassRefDType* adtypep = VN_CAST_CONST(dtypep, ClassRefDType)) {
         VlArgTypeRecursed info;
-        info.m_oprefix = "VlClassRef<" + adtypep->nameProtect() + ">";
+        info.m_oprefix = "VlClassRef<" + EmitCBaseVisitor::prefixNameProtect(adtypep) + ">";
         return info;
     } else if (const AstUnpackArrayDType* adtypep = VN_CAST_CONST(dtypep, UnpackArrayDType)) {
         VlArgTypeRecursed info = vlArgTypeRecurse(forFunc, adtypep->subDTypep(), arrayed);
@@ -985,6 +986,11 @@ void AstCell::dump(std::ostream& str) const {
 void AstCellInline::dump(std::ostream& str) const {
     this->AstNode::dump(str);
     str<<" -> "<<origModName();
+}
+const char* AstClassPackage::broken() const {
+    BROKEN_BASE_RTN(AstNodeModule::broken());
+    BROKEN_RTN(m_classp && !m_classp->brokeExists());
+    return NULL;
 }
 void AstClass::repairCache() {
     clearCache();

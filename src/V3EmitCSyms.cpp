@@ -290,6 +290,7 @@ class EmitCSyms : EmitCBaseVisitor {
         }
     }
     virtual void visit(AstScope* nodep) VL_OVERRIDE {
+        if (VN_IS(m_modp, Class)) return;  // The ClassPackage is what is visible
         nameCheck(nodep);
 
         m_scopes.push_back(make_pair(nodep, m_modp));
@@ -382,10 +383,12 @@ void EmitCSyms::emitClassesFwdHdr() {
 
     // Not included directly, so no verilated.h etc
 
+    //FIXME do we even need this as special file as everything should be using a pointer to it, never the class directly
+
     puts("\n// USER CLASSES\n");
     for (AstNode* nodep = v3Global.rootp()->modulesp(); nodep; nodep = nodep->nextp()) {
         if (AstClass* classp = VN_CAST(nodep, Class)) {
-            puts("class " + classp->nameProtect() + ";\n");
+            puts("class " + prefixNameProtect(classp) + ";\n");
         }
     }
 
@@ -415,12 +418,14 @@ void EmitCSyms::emitSymHdr() {
         puts("#include \"verilated.h\"\n");
     }
     if (v3Global.needClasses()) {
+        puts("#include \"" + classesFilename() + "Fwd.h\"\n");
         puts("#include \"" + classesFilename() + ".h\"\n");
     }
 
     puts("\n// INCLUDE MODULE CLASSES\n");
     for (AstNodeModule* nodep = v3Global.rootp()->modulesp();
          nodep; nodep=VN_CAST(nodep->nextp(), NodeModule)) {
+        if (VN_IS(nodep, Class)) continue;  // Class included earlier
         puts("#include \"" + prefixNameProtect(nodep) + ".h\"\n");
     }
 
@@ -454,7 +459,7 @@ void EmitCSyms::emitSymHdr() {
     for (std::vector<ScopeModPair>::iterator it = m_scopes.begin(); it != m_scopes.end(); ++it) {
         AstScope* scopep = it->first;
         AstNodeModule* modp = it->second;
-        if (VN_IS(modp, Class)) continue;   // FIXME suppresses making scope; need this for static etc
+        if (VN_IS(modp, Class)) continue;
         if (modp->isTop()) {
             ofp()->printf("%-30s ", (prefixNameProtect(modp) + "*").c_str());
             puts(protectIf(scopep->nameDotless() + "p", scopep->protect()) + ";\n");
@@ -558,6 +563,7 @@ void EmitCSyms::emitSymImpPreamble() {
     puts("#include \""+symClassName()+".h\"\n");
     for (AstNodeModule* nodep = v3Global.rootp()->modulesp(); nodep;
          nodep = VN_CAST(nodep->nextp(), NodeModule)) {
+        if (VN_IS(nodep, Class)) continue;  // Class included earlier
         puts("#include \"" + prefixNameProtect(nodep) + ".h\"\n");
     }
 }

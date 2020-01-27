@@ -1343,6 +1343,9 @@ class TristateVisitor : public TristateBaseVisitor {
         m_tgraph.clear();  // Recursion not supported
     }
 
+    virtual void visit(AstClass* nodep) VL_OVERRIDE {
+        // don't deal with classes
+    }
     virtual void visit(AstNodeFTask* nodep) VL_OVERRIDE {
         // don't deal with functions
     }

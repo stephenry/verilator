@@ -16,7 +16,5 @@ execute(
     check_finished => 1,
     );
 
-file_grep_not("$Self->{obj_dir}/V$Self->{name}__Syms.h", qr/Dead/x);
-
 ok(1);
 1;

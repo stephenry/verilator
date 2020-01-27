@@ -1,0 +1,11 @@
+ClsZ::new
+ClsA::new
+ClsB::new
+makec;
+c = new;
+ClsC::new
+c.access;
+ClsC::access
+ClsA::new
+ClsA::access
+*-* All Finished *-*

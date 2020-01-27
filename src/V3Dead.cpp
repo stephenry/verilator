@@ -155,7 +155,11 @@ private:
         checkAll(nodep);
         if (nodep->aboveScopep()) nodep->aboveScopep()->user1Inc();
 
-        if (!nodep->isTop() && !nodep->varsp() && !nodep->blocksp() && !nodep->finalClksp()) {
+        if (!nodep->isTop() && !nodep->varsp() && !nodep->blocksp() && !nodep->finalClksp()
+            // Class packages might have no children, but need to remain as
+            // long as the class they refer to is needed
+            // FIXME do something to remove unused classes
+            && !VN_IS(m_modp, ClassPackage)) {
             m_scopesp.push_back(nodep);
         }
     }
@@ -206,6 +210,7 @@ private:
         iterateChildren(nodep);
         checkAll(nodep);
         if (nodep->extendsp()) nodep->extendsp()->user1Inc();
+        if (nodep->packagep()) nodep->packagep()->user1Inc();
         m_classesp.push_back(nodep);
     }
     virtual void visit(AstClassRefDType* nodep) VL_OVERRIDE {

@@ -356,6 +356,12 @@ std::string VL_TO_STRING(const VlQueue<T_Value>& obj) {
 # define VlClassRef std::shared_ptr
 #endif
 
+template <class T>  // T typically of type VlClassRef<x>
+inline T VL_NULL_CHECK(T t, const char* filename, int linenum) {
+    if (VL_UNLIKELY(!t)) Verilated::nullPointerError(filename, linenum);
+    return t;
+}
+
 //======================================================================
 // Conversion functions
 

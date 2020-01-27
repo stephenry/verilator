@@ -7,9 +7,6 @@ virtual vi_t vi2;
 %Error: t/t_class_unsup_bad.v:13: Unsupported: class parameters
    localparam LOCPAR = 10;
                          ^
-%Error: t/t_class_unsup_bad.v:16: Unsupported: 'local' class item
-   local int loc;
-   ^~~~~
 %Error: t/t_class_unsup_bad.v:24: Unsupported: virtual class member qualifier
    virtual function void func_virtual; endfunction
    ^~~~~~~

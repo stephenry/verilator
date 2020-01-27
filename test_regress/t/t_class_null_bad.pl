@@ -13,10 +13,9 @@ compile(
     );
 
 execute(
-    check_finished => 1,
+    fails => 1,
+    expect_filename => $Self->{golden_filename},
     );
-
-file_grep_not("$Self->{obj_dir}/V$Self->{name}__Syms.h", qr/Dead/x);
 
 ok(1);
 1;

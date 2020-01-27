@@ -7,16 +7,12 @@ if (!$::Driver) { use FindBin; exec("$FindBin::Bin/bootstrap.pl", @ARGV, $0); di
 # Lesser General Public License Version 3 or the Perl Artistic License
 # Version 2.0.
 
-scenarios(simulator => 1);
+scenarios(linter => 1);
 
-compile(
+lint(
+    fails => 1,
+    expect_filename => $Self->{golden_filename},
     );
-
-execute(
-    check_finished => 1,
-    );
-
-file_grep_not("$Self->{obj_dir}/V$Self->{name}__Syms.h", qr/Dead/x);
 
 ok(1);
 1;

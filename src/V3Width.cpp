@@ -2203,19 +2203,16 @@ private:
         // No need to width-resolve the class, as it was done when we did the child
         AstClass* first_classp = adtypep->classp();
         UASSERT_OBJ(first_classp, nodep, "Unlinked");
-        AstMethodCall* newp = NULL;
         for (AstClass* classp = first_classp; classp;) {
             if (AstNodeFTask* ftaskp = VN_CAST(classp->findMember(nodep->name()), NodeFTask)) {
                 nodep->taskp(ftaskp);
                 nodep->dtypeFrom(ftaskp);
-                //ftaskp->dumpTree(cout, "FIXMEfound: ");
                 if (VN_IS(ftaskp, Task)) nodep->makeStatement();
                 return;
             }
             classp = classp->extendsp() ? classp->extendsp()->classp() : NULL;
         }
-        //FIXME newp always NULL
-        if (!newp) {
+        {
             VSpellCheck speller;
             for (AstClass* classp = first_classp; classp;) {
                 for (AstNode* itemp = classp->membersp(); itemp; itemp = itemp->nextp()) {
@@ -2229,13 +2226,7 @@ private:
                            << first_classp->prettyNameQ() << "\n"
                            << (suggest.empty() ? "" : nodep->fileline()->warnMore() + suggest));
         }
-        if (newp) {
-            newp->didWidth(true);
-            nodep->replaceWith(newp);
-            VL_DO_DANGLING(nodep->deleteTree(), nodep);
-        } else {
-            nodep->dtypeSetSigned32();  // Guess on error
-        }
+        nodep->dtypeSetSigned32();  // Guess on error
     }
     void methodCallUnpack(AstMethodCall* nodep, AstUnpackArrayDType* adtypep) {
         enum { UNKNOWN = 0, ARRAY_OR, ARRAY_AND, ARRAY_XOR } methodId;
@@ -2358,7 +2349,6 @@ private:
 
     virtual void visit(AstNew* nodep) VL_OVERRIDE {
         if (nodep->didWidthAndSet()) return;
-        userIterateChildren(nodep, WidthVP(SELF, BOTH).p());
         AstClassRefDType* refp = VN_CAST(m_vup->dtypeNullp(), ClassRefDType);
         if (!refp) {  // e.g. int a = new;
             if (refp) UINFO(1, "Got refp "<<refp<<endl);
@@ -2366,6 +2356,19 @@ private:
             return;
         }
         nodep->dtypep(refp);
+        if (nodep->rhsp()) {
+            userIterateChildren(nodep, WidthVP(SELF, BOTH).p());
+            if (!similarDTypeRecurse(nodep->dtypep(), nodep->rhsp()->dtypep())) {
+                nodep->rhsp()->v3error("New-as-copier passed different data type '"
+                                       << nodep->dtypep()->prettyTypeName() << "' then expected '"
+                                       << nodep->rhsp()->dtypep()->prettyTypeName() << "'");
+            }
+        } else if (nodep->argsp()) {
+            nodep->v3error("Unsupported: new with arguments");
+            userIterateChildren(nodep, WidthVP(SELF, BOTH).p());
+        } else if (nodep->rhsp() && nodep->argsp()) {
+            UASSERT_OBJ(0, nodep, "new cannot be both copy and constructor");
+        }
     }
 
     virtual void visit(AstPattern* nodep) VL_OVERRIDE {
@@ -3254,6 +3257,7 @@ private:
     }
     virtual void visit(AstNodeFTask* nodep) VL_OVERRIDE {
         // Grab width from the output variable (if it's a function)
+        if (nodep->name() == "new") nodep->v3error("Unsupported: new constructor");
         if (nodep->didWidth()) return;
         if (nodep->doingWidth()) {
             nodep->v3error("Unsupported: Recursive function or task call");

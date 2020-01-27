@@ -251,19 +251,44 @@ public:
     AstRange* rangep() const { return VN_CAST(op2p(), Range); }  // op2 = Range of pin
 };
 
+//######################################################################
+// Classes
+
+class AstClassPackage : public AstNodeModule {
+    // The static information portion of a class (treated similarly to a package)
+    AstClass* m_classp;  // Class package this is under (weak pointer, hard link is other way)
+public:
+    AstClassPackage(FileLine* fl, const string& name)
+        : ASTGEN_SUPER(fl, name) {}
+    ASTNODE_NODE_FUNCS(ClassPackage)
+    virtual string verilogKwd() const { return "/*class*/package"; }
+    virtual const char* broken() const;
+    AstClass* classp() const { return m_classp; }
+    void classp(AstClass* classp) { m_classp = classp; }
+};
+
 class AstClass : public AstNodeModule {
     // TYPES
     typedef std::map<string, AstNode*> MemberNameMap;
     // MEMBERS
     MemberNameMap m_members;  // Members or method children
+    AstClassPackage* m_packagep;  // Class package this is under
 public:
     AstClass(FileLine* fl, const string& name)
-        : ASTGEN_SUPER(fl, name) {}
+        : ASTGEN_SUPER(fl, name)
+        , m_packagep(NULL) {}
     ASTNODE_NODE_FUNCS(Class)
     virtual string verilogKwd() const { return "class"; }
     virtual bool maybePointedTo() const { return true; }
     virtual void dump(std::ostream& str) const;
+    virtual const char* broken() const {
+        BROKEN_BASE_RTN(AstNodeModule::broken());
+        BROKEN_RTN(m_packagep && !m_packagep->brokeExists());
+        return NULL;
+    }
     // op1/op2/op3 in AstNodeModule
+    AstClassPackage* packagep() const { return m_packagep; }
+    void packagep(AstClassPackage* classpackagep) { m_packagep = classpackagep; }
     AstNode* membersp() const { return stmtsp(); }  // op2 = List of statements
     void addMembersp(AstNode* nodep) { addStmtp(nodep); }
     AstClassExtends* extendsp() const { return VN_CAST(op4p(), ClassExtends); }
@@ -757,7 +782,8 @@ public:
         const AstClassRefDType* asamep = static_cast<const AstClassRefDType*>(samep);
         return (m_classp == asamep->m_classp
                 && m_packagep == asamep->m_packagep); }
-    virtual bool similarDType(AstNodeDType* samep) const { return this == samep; }
+    virtual bool similarDType(AstNodeDType* samep) const {
+        return this == samep || same(samep); }
     virtual V3Hash sameHash() const { return V3Hash(V3Hash(m_classp), V3Hash(m_packagep)); }
     virtual void dump(std::ostream& str=std::cout) const;
     virtual void dumpSmall(std::ostream& str) const;
@@ -3948,22 +3974,26 @@ public:
 };
 
 class AstNew : public AstNodeMath {
+    // New is either a shallow copy or constructor
     // Parents: math|stmt
     // Children: varref|arraysel, math
 public:
-    AstNew(FileLine* fl)
+    AstNew(FileLine* fl, AstNode* rhsp, AstNode* argsp)
         : ASTGEN_SUPER(fl) {
-        dtypep(NULL);  // V3Width will resolve
+        UASSERT_OBJ(!rhsp || !argsp, this, "New is either copier or constructor");
+        dtypeFrom(rhsp);  // otherwise V3Width will resolve
+        setNOp1p(rhsp);
+        addNOp2p(argsp);
     }
     ASTNODE_NODE_FUNCS(New)
-    virtual void numberOperate(V3Number& out, const V3Number& lhs, const V3Number& rhs) {
-        V3ERROR_NA; /* How can from be a const? */ }
     virtual V3Hash sameHash() const { return V3Hash(); }
     virtual string emitVerilog() { return "new"; }
     virtual string emitC() { V3ERROR_NA; return ""; }
     virtual bool cleanOut() const { return true; }
     virtual bool same(const AstNode* samep) const { return true; }
     virtual int instrCount() const { return widthInstrs(); }
+    AstNode* rhsp() const { return op1p(); }
+    AstNode* argsp() const { return op2p(); }
 };
 
 class AstPragma : public AstNode {
@@ -4014,6 +4044,27 @@ public:
     virtual V3Hash sameHash() const { return V3Hash(fileline()->lineno()); }
     virtual bool same(const AstNode* samep) const {
         return fileline() == samep->fileline(); }
+};
+
+class AstNullCheck : public AstNodeUniop {
+    // Return LHS after checking that LHS is non-null
+    // Children: VarRef or something returning pointer
+public:
+    AstNullCheck(FileLine* fl, AstNode* lhsp)
+        : ASTGEN_SUPER(fl, lhsp) {
+        dtypeFrom(lhsp);
+    }
+    ASTNODE_NODE_FUNCS(NullCheck)
+    virtual void numberOperate(V3Number& out, const V3Number& lhs) { V3ERROR_NA; }
+    virtual int instrCount() const { return 1; }  // Rarely executes
+    virtual string emitVerilog() { return "%l"; }
+    virtual string emitC() { V3ERROR_NA; return ""; }
+    virtual string emitSimpleOperator() { V3ERROR_NA; return "";}
+    virtual bool cleanOut() const { return true; }
+    virtual bool cleanLhs() const { return true; }
+    virtual bool sizeMattersLhs() const { return false; }
+    virtual V3Hash sameHash() const { return V3Hash(fileline()->lineno()); }
+    virtual bool same(const AstNode* samep) const { return fileline() == samep->fileline(); }
 };
 
 class AstTraceDecl : public AstNodeStmt {

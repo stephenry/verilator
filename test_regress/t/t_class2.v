@@ -3,20 +3,30 @@
 // This file ONLY is placed into the Public Domain, for any use,
 // without warranty, 2020 by Wilson Snyder.
 
-// Note UVM internals do not require classes-in-classes
-package P;
+class Dead;
+endclass
+
+module ModDead;
+class DeadInMod;
+   int memberdead;
+endclass
+endmodule
+
+module t (/*AUTOARG*/);
 class Cls;
    int imembera;
    int imemberb;
 endclass : Cls
-endpackage : P
 
-class Dead;
-endclass
+   Cls c;
+   Cls d;
 
-module t (/*AUTOARG*/);
-   P::Cls c;
-   P::Cls d;
+   generate
+      if (0) begin
+         ModDead cellDead();
+      end
+   endgenerate
+
    initial begin
       // Alternate between two versions to make sure we don't
       // constant propagate between them.

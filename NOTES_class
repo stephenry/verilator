@@ -8,11 +8,21 @@ Next steps:
 * Member functions -- into V3Task then problems .
 * Once member functions work plan on merging to master.
 
+* class parameter: verilog.y needs to parse.  Modules-in-modules might be a problem.
+* class constructors
+* static properties
+* this
+* const int
+* virtual function
+* virtual class
+* extern function
+
 Once in master, file a bug on adding these that others can probably help:
 * Enable V3Task function inlining
 * Warn on unused class
 * Warn on unused members
 * Warn on unused methods
+* Warn on "local" and "protected" violations
 * Create test cases for each major set of class features.
   -- See github sv_tests as a starting point, though note these need work to be good self-checking
      tests tests
