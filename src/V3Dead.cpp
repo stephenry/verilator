@@ -141,6 +141,13 @@ private:
             if (!nodep->dead()) {
                 iterateChildren(nodep);
                 checkAll(nodep);
+                if (AstClass* classp = VN_CAST(nodep, Class)) {
+                    if (classp->extendsp()) classp->extendsp()->user1Inc();
+                    if (classp->packagep()) classp->packagep()->user1Inc();
+                    m_classesp.push_back(classp);
+                    // FIXME make reclimation work
+                    classp->user1Inc();
+                }
             }
         }
         m_modp = origModp;
@@ -154,12 +161,11 @@ private:
         iterateChildren(nodep);
         checkAll(nodep);
         if (nodep->aboveScopep()) nodep->aboveScopep()->user1Inc();
-
-        if (!nodep->isTop() && !nodep->varsp() && !nodep->blocksp() && !nodep->finalClksp()
-            // Class packages might have no children, but need to remain as
-            // long as the class they refer to is needed
-            // FIXME do something to remove unused classes
-            && !VN_IS(m_modp, ClassPackage)) {
+        // Class packages might have no children, but need to remain as
+        // long as the class they refer to is needed
+        // FIXME do something to remove unused classes
+        if (VN_IS(m_modp, Class) || VN_IS(m_modp, ClassPackage)) nodep->user1Inc();
+        if (!nodep->isTop() && !nodep->varsp() && !nodep->blocksp() && !nodep->finalClksp()) {
             m_scopesp.push_back(nodep);
         }
     }
@@ -205,13 +211,6 @@ private:
             if (m_elimCells) nodep->packagep(NULL);
             else nodep->packagep()->user1Inc();
         }
-    }
-    virtual void visit(AstClass* nodep) VL_OVERRIDE {
-        iterateChildren(nodep);
-        checkAll(nodep);
-        if (nodep->extendsp()) nodep->extendsp()->user1Inc();
-        if (nodep->packagep()) nodep->packagep()->user1Inc();
-        m_classesp.push_back(nodep);
     }
     virtual void visit(AstClassRefDType* nodep) VL_OVERRIDE {
         iterateChildren(nodep);
