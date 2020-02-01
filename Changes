@@ -9,6 +9,8 @@ The contributors that suggested a given feature are shown in []. Thanks!
 
 **    Add -match to lint_off to waive warnings. [Philipp Wagner]
 
+***   Link Verilator binary partially statically, #2146. [Geza Lore]
+
 ***   Verilation speed improvements, #2133, #2138. [Geza Lore]
 
 ***   Support libgoogle-perftools-dev's libtcmalloc if available, #2137. [Geza Lore]
@@ -31,9 +33,13 @@ The contributors that suggested a given feature are shown in []. Thanks!
 
 ****  Add parameter to set maximum signal width, #2082. [Øyvind Harboe]
 
+****  Add warning on genvar in normal for loop, #2143. [yurivict]
+
 ****  Fix VPI scope naming for public modules. [Nandu Raj]
 
 ****  Fix FST tracing of enums inside structs. [fsiegle]
+
+****  Fix WIDTH warning on </<= of narrower value, #2141. [agrobman]
 
 
 * Verilator 4.026 2020-01-11

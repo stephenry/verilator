@@ -548,7 +548,7 @@ private:
             if (!constp) { nodep->v3error("Replication value isn't a constant."); return; }
             uint32_t times = constp->toUInt();
             if (times==0 && !VN_IS(nodep->backp(), Concat)) {  // Concat Visitor will clean it up.
-                nodep->v3error("Replication value of 0 is only legal under a concatenation (IEEE 2017 11.4.12.1)");
+                nodep->v3error("Replication value of 0 is only legal under a concatenation (IEEE 1800-2017 11.4.12.1)");
                 times = 1;
             }
             if (nodep->lhsp()->isString()) {
@@ -581,7 +581,7 @@ private:
             if (!constp) { nodep->v3error("Replication value isn't a constant."); return; }
             uint32_t times = constp->toUInt();
             if (times==0 && !VN_IS(nodep->backp(), Concat)) {  // Concat Visitor will clean it up.
-                nodep->v3error("Replication value of 0 is only legal under a concatenation (IEEE 2017 11.4.12.1)");
+                nodep->v3error("Replication value of 0 is only legal under a concatenation (IEEE 1800-2017 11.4.12.1)");
             }
             nodep->dtypeSetString();
         }
@@ -943,10 +943,10 @@ private:
                 V3Const::constifyParamsEdit(nodep->ticksp());  // ticksp may change
                 const AstConst* constp = VN_CAST(nodep->ticksp(), Const);
                 if (!constp || constp->toSInt() < 1) {
-                    nodep->v3error("$past tick value must be constant (IEEE 2017 16.9.3)");
+                    nodep->v3error("$past tick value must be constant (IEEE 1800-2017 16.9.3)");
                     nodep->ticksp()->unlinkFrBack()->deleteTree();
                 } else if (constp->toSInt() < 1) {
-                    constp->v3error("$past tick value must be >= 1 (IEEE 2017 16.9.3)");
+                    constp->v3error("$past tick value must be >= 1 (IEEE 1800-2017 16.9.3)");
                     nodep->ticksp()->unlinkFrBack()->deleteTree();
                 } else {
                     if (constp->toSInt() > 10) {
@@ -1588,9 +1588,9 @@ private:
             }
             if (!itemp->valuep()) {
                 if (num.isEqZero() && itemp != nodep->itemsp())
-                    itemp->v3error("Enum value illegally wrapped around (IEEE 2017 6.19)");
+                    itemp->v3error("Enum value illegally wrapped around (IEEE 1800-2017 6.19)");
                 if (num.isFourState())
-                    itemp->v3error("Enum value that is unassigned cannot follow value with X/Zs (IEEE 2017 6.19)");
+                    itemp->v3error("Enum value that is unassigned cannot follow value with X/Zs (IEEE 1800-2017 6.19)");
                 if (!nodep->dtypep()->basicp()
                     && !nodep->dtypep()->basicp()->keyword().isIntNumeric()) {
                     itemp->v3error("Enum names without values only allowed on numeric types");
@@ -1602,7 +1602,7 @@ private:
             AstConst* constp = VN_CAST(itemp->valuep(), Const);
             if (constp->num().isFourState() && nodep->dtypep()->basicp()
                 && !nodep->dtypep()->basicp()->isFourstate())
-                itemp->v3error("Enum value with X/Zs cannot be assigned to non-fourstate type (IEEE 2017 6.19)");
+                itemp->v3error("Enum value with X/Zs cannot be assigned to non-fourstate type (IEEE 1800-2017 6.19)");
             num.opAssign(constp->num());
             // Look for duplicates
             if (inits.find(num) != inits.end()) {  // IEEE says illegal
@@ -3073,7 +3073,7 @@ private:
             if (!adtypep->keyDTypep()->skipRefp()->basicp()
                 || !adtypep->keyDTypep()->skipRefp()->basicp()->keyword().isIntNumeric()) {
                 nodep->memp()->v3error(nodep->verilogKwd()
-                                       << " address/key must be integral (IEEE 21.4.1)");
+                                       << " address/key must be integral (IEEE 1800-2017 21.4.1)");
             }
         } else if (AstUnpackArrayDType* adtypep
                    = VN_CAST(nodep->memp()->dtypep()->skipRefp(), UnpackArrayDType)) {
@@ -3607,10 +3607,23 @@ private:
                 int ewidth = std::max(nodep->lhsp()->widthMin(), nodep->rhsp()->widthMin());
                 AstNodeDType* subDTypep = nodep->findLogicDType(width, ewidth,
                                                                 AstNumeric::fromBool(signedFl));
+                bool warnOn = true;
+                if (!signedFl && width == 32) {
+                    // Waive on unsigned < or <= if RHS is narrower, since can't give wrong answer
+                    if ((VN_IS(nodep, Lt) || VN_IS(nodep, Lte))
+                        && (nodep->lhsp()->width() >= nodep->rhsp()->widthMin())) {
+                        warnOn = false;
+                    }
+                    // Waive on unsigned > or >= if RHS is wider, since can't give wrong answer
+                    if ((VN_IS(nodep, Gt) || VN_IS(nodep, Gte))
+                        && (nodep->lhsp()->widthMin() >= nodep->rhsp()->width())) {
+                        warnOn = false;
+                    }
+                }
                 iterateCheck(nodep, "LHS", nodep->lhsp(), CONTEXT, FINAL, subDTypep,
-                             signedFl ? EXTEND_LHS:EXTEND_ZERO);
+                             (signedFl ? EXTEND_LHS : EXTEND_ZERO), warnOn);
                 iterateCheck(nodep, "RHS", nodep->rhsp(), CONTEXT, FINAL, subDTypep,
-                             signedFl ? EXTEND_LHS:EXTEND_ZERO);
+                             (signedFl ? EXTEND_LHS : EXTEND_ZERO), warnOn);
             }
             nodep->dtypeSetLogicBool();
         }
