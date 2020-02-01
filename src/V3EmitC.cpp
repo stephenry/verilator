@@ -3001,7 +3001,7 @@ class EmitCClassesInt : EmitCStmts {
 
         ofp()->putsPrivate(false);
         puts(  "// INTERNAL METHODS\n");
-        emitIntFuncDecls(nodep);
+        emitIntFuncDecls(nodep, true);
         ofp()->putsPrivate(false);
         puts(  "std::string to_string() const;\n");
         puts(  "std::string to_string_middle() const;\n");
