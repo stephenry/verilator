@@ -38,6 +38,7 @@
 #include "V3Coverage.h"
 #include "V3CoverageJoin.h"
 #include "V3CCtors.h"
+#include "V3CUse.h"
 #include "V3Dead.h"
 #include "V3Delayed.h"
 #include "V3Depth.h"
@@ -377,6 +378,9 @@ static void process() {
     //--MODULE OPTIMIZATIONS--------------
 
     if (!v3Global.opt.xmlOnly()) {
+        // Create AstCUse to determine what class forward declarations/#includes needed in C
+        V3CUse::cUseAll(v3Global.rootp());
+
         // Split deep blocks to appease MSVC++.  Must be before Localize.
         if (!v3Global.opt.lintOnly() && v3Global.opt.compLimitBlocks()) {
             V3DepthBlock::depthBlockAll(v3Global.rootp());

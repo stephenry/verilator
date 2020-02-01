@@ -1009,6 +1009,7 @@ public:
     virtual void visit(AstTraceInc*) VL_OVERRIDE {}  // Handled outside the Visit class
     virtual void visit(AstCFile*) VL_OVERRIDE {}  // Handled outside the Visit class
     virtual void visit(AstCellInline*) VL_OVERRIDE {}  // Handled outside the Visit class (EmitCSyms)
+    virtual void visit(AstCUse*) VL_OVERRIDE {}  // Handled outside the Visit class
     // Default
     virtual void visit(AstNode* nodep) VL_OVERRIDE {
         puts(string("\n???? // ")+nodep->prettyTypeName()+"\n");
@@ -1409,6 +1410,24 @@ class EmitCImp : EmitCStmts {
 
     // METHODS
     // Low level
+    void emitModCUse(AstNodeModule* modp, VUseType useType) {
+        string nl;
+        for (AstNode* itemp = modp->stmtsp(); itemp; itemp = itemp->nextp()) {
+            if (AstCUse* usep = VN_CAST(itemp, CUse)) {
+                if (usep->useType() == useType) {
+                    if (usep->useType().isInclude()) {
+                        puts("#include \"" + prefixNameProtect(usep) + ".h\"\n");
+                    }
+                    if (usep->useType().isFwdClass()) {
+                        puts("class " + prefixNameProtect(usep) + ";\n");
+                    }
+                    nl = "\n";
+                }
+            }
+        }
+        puts(nl);
+    }
+
     void emitVarReset(AstVar* varp) {
         AstNodeDType* dtypep = varp->dtypep()->skipRefp();
         if (varp->isIO() && m_modp->isTop() && optSystemC()) {
@@ -2652,21 +2671,11 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
     }
     puts("\n");
 
+    emitModCUse(modp, VUseType::INT_INCLUDE);
+
     // Declare foreign instances up front to make C++ happy
-    puts("class "+symClassName()+";\n");
-    vl_unordered_set<string> didClassName;
-    for (AstNode* nodep = modp->stmtsp(); nodep; nodep = nodep->nextp()) {
-        if (AstCell* cellp = VN_CAST(nodep, Cell)) {
-            string className = prefixNameProtect(cellp->modp());
-            if (didClassName.find(className) == didClassName.end()) {
-                puts("class " + className + ";\n");
-                didClassName.insert(className);
-            }
-        }
-    }
-    if (v3Global.opt.trace()) {
-        puts("class "+v3Global.opt.traceClassBase()+";\n");
-    }
+    puts("class " + symClassName() + ";\n");
+    emitModCUse(modp, VUseType::INT_FWD_CLASS);
 
     puts("\n//----------\n\n");
     emitTextSection(AstType::atScHdr);
@@ -2865,6 +2874,9 @@ void EmitCImp::emitImpTop(AstNodeModule* fileModp) {
         puts("\n");
         puts("#include \"verilated_dpi.h\"\n");
     }
+
+    emitModCUse(fileModp, VUseType::IMP_INCLUDE);
+    emitModCUse(fileModp, VUseType::IMP_FWD_CLASS);
 
     puts("\n");
     emitTextSection(AstType::atScImpHdr);
