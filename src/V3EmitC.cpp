@@ -78,7 +78,7 @@ public:
     void emitVarDecl(const AstVar* nodep, const string& prefixIfImp);
     typedef enum {EVL_CLASS_IO, EVL_CLASS_SIG, EVL_CLASS_TEMP, EVL_CLASS_PAR, EVL_CLASS_ALL,
                   EVL_FUNC_ALL} EisWhich;
-    void emitVarList(AstNode* firstp, EisWhich which, const string& prefixIfImp);
+    void emitVarList(AstNode* firstp, EisWhich which, const string& prefixIfImp, string& sectionr);
     static void emitVarSort(const VarSortMap& vmap, VarVec* sortedp);
     void emitSortedVarList(const VarVec& anons,
                            const VarVec& nonanons, const string& prefixIfImp);
@@ -1293,8 +1293,9 @@ class EmitCImp : EmitCStmts {
                 if (varp->isFuncReturn()) emitVarDecl(varp, "");
             }
         }
-        emitVarList(nodep->initsp(), EVL_FUNC_ALL, "");
-        emitVarList(nodep->stmtsp(), EVL_FUNC_ALL, "");
+        string section;
+        emitVarList(nodep->initsp(), EVL_FUNC_ALL, "", section/*ref*/);
+        emitVarList(nodep->stmtsp(), EVL_FUNC_ALL, "", section/*ref*/);
 
         iterateAndNextNull(nodep->initsp());
 
@@ -1585,6 +1586,7 @@ class EmitCImp : EmitCStmts {
     void emitWrapEval(AstNodeModule* modp);
     void emitMTaskState();
     void emitMTaskVertexCtors(bool* firstp);
+    void emitIntTop(AstNodeModule* modp);
     void emitInt(AstNodeModule* modp);
     void maybeSplit(AstNodeModule* modp);
 
@@ -1595,7 +1597,8 @@ public:
         m_fast = false;
     }
     virtual ~EmitCImp() {}
-    void main(AstNodeModule* modp, bool slow, bool fast);
+    void mainImp(AstNodeModule* modp, bool slow, bool fast);
+    void mainInt(AstNodeModule* modp);
     void mainDoFunc(AstCFunc* nodep) {
         iterate(nodep);
     }
@@ -2429,7 +2432,8 @@ void EmitCImp::emitWrapEval(AstNodeModule* modp) {
 //----------------------------------------------------------------------
 // Top interface/ implementation
 
-void EmitCStmts::emitVarList(AstNode* firstp, EisWhich which, const string& prefixIfImp) {
+void EmitCStmts::emitVarList(AstNode* firstp, EisWhich which, const string& prefixIfImp,
+                             string& sectionr) {
     // Put out a list of signal declarations
     // in order of 0:clocks, 1:vluint8, 2:vluint16, 4:vluint32, 5:vluint64, 6:wide, 7:arrays
     // This aids cache packing and locality
@@ -2486,11 +2490,17 @@ void EmitCStmts::emitVarList(AstNode* firstp, EisWhich which, const string& pref
         }
     }
 
-    VarVec anons;
-    VarVec nonanons;
-    emitVarSort(varAnonMap, &anons);
-    emitVarSort(varNonanonMap, &nonanons);
-    emitSortedVarList(anons, nonanons, prefixIfImp);
+    if (!varAnonMap.empty() || !varNonanonMap.empty()) {
+        if (!sectionr.empty()) {
+            puts(sectionr);
+            sectionr = "";
+        }
+        VarVec anons;
+        VarVec nonanons;
+        emitVarSort(varAnonMap, &anons);
+        emitVarSort(varNonanonMap, &nonanons);
+        emitSortedVarList(anons, nonanons, prefixIfImp);
+    }
 }
 
 void EmitCStmts::emitVarSort(const VarSortMap& vmap, VarVec* sortedp) {
@@ -2637,7 +2647,7 @@ void EmitCImp::emitMTaskState() {
     puts("bool __Vm_even_cycle;\n");
 }
 
-void EmitCImp::emitInt(AstNodeModule* modp) {
+void EmitCImp::emitIntTop(AstNodeModule* modp) {
     // Always have this first; gcc has short circuiting if #ifdef is first in a file
     ofp()->putsGuard();
     puts("\n");
@@ -2648,12 +2658,8 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
     } else {
         puts("#include \"verilated.h\"\n");
     }
-    if (v3Global.opt.mtasks()) {
-        puts("#include \"verilated_threads.h\"\n");
-    }
-    if (v3Global.opt.savable()) {
-        puts("#include \"verilated_save.h\"\n");
-    }
+    if (v3Global.opt.mtasks()) puts("#include \"verilated_threads.h\"\n");
+    if (v3Global.opt.savable()) puts("#include \"verilated_save.h\"\n");
     if (v3Global.opt.coverage()) {
         puts("#include \"verilated_cov.h\"\n");
         if (v3Global.opt.savable()) v3error("--coverage and --savable not supported together");
@@ -2670,7 +2676,9 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
         puts("#include \"" + topClassName() + "__Dpi.h\"\n");
     }
     puts("\n");
+}
 
+void EmitCImp::emitInt(AstNodeModule* modp) {
     emitModCUse(modp, VUseType::INT_INCLUDE);
 
     // Declare foreign instances up front to make C++ happy
@@ -2705,41 +2713,41 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
 
     emitTypedefs(modp->stmtsp());
 
-    puts("\n// PORTS\n");
-    if (modp->isTop()) puts("// The application code writes and reads these signals to\n");
-    if (modp->isTop()) puts("// propagate new values into/out from the Verilated model.\n");
-    emitVarList(modp->stmtsp(), EVL_CLASS_IO, "");
+    string section;
+    section = "\n// PORTS\n";
+    if (modp->isTop()) section += ("// The application code writes and reads these signals to\n"
+                                   "// propagate new values into/out from the Verilated model.\n");
+    emitVarList(modp->stmtsp(), EVL_CLASS_IO, "", section/*ref*/);
 
-    puts("\n// LOCAL SIGNALS\n");
-    if (modp->isTop()) puts("// Internals; generally not touched by application code\n");
-    emitVarList(modp->stmtsp(), EVL_CLASS_SIG, "");
+    section = "\n// LOCAL SIGNALS\n";
+    if (modp->isTop()) section += "// Internals; generally not touched by application code\n";
+    emitVarList(modp->stmtsp(), EVL_CLASS_SIG, "", section/*ref*/);
 
-    puts("\n// LOCAL VARIABLES\n");
-    if (modp->isTop()) puts("// Internals; generally not touched by application code\n");
-    emitVarList(modp->stmtsp(), EVL_CLASS_TEMP, "");
+    section = "\n// LOCAL VARIABLES\n";
+    if (modp->isTop()) section += "// Internals; generally not touched by application code\n";
+    emitVarList(modp->stmtsp(), EVL_CLASS_TEMP, "", section/*ref*/);
 
     puts("\n// INTERNAL VARIABLES\n");
     if (modp->isTop()) puts("// Internals; generally not touched by application code\n");
     ofp()->putsPrivate(!modp->isTop());  // private: unless top
     puts(symClassName()+"* __VlSymsp;  // Symbol table\n");
     ofp()->putsPrivate(false);  // public:
-    if (modp->isTop()) {
-        if (v3Global.opt.inhibitSim()) {
-            puts("bool __Vm_inhibitSim;  ///< Set true to disable evaluation of module\n");
-        }
+    if (modp->isTop() && v3Global.opt.inhibitSim()) {
+        puts("bool __Vm_inhibitSim;  ///< Set true to disable evaluation of module\n");
     }
     if (modp->isTop() && v3Global.opt.mtasks()) {
         emitMTaskState();
     }
     emitCoverageDecl(modp);  // may flip public/private
 
-    puts("\n// PARAMETERS\n");
-    if (modp->isTop()) puts("// Parameters marked /*verilator public*/ for use by application code\n");
+    section = "\n// PARAMETERS\n";
+    if (modp->isTop()) section += "// Parameters marked /*verilator public*/ for use by application code\n";
     ofp()->putsPrivate(false);  // public:
-    emitVarList(modp->stmtsp(), EVL_CLASS_PAR, "");  // Only those that are non-CONST
+    emitVarList(modp->stmtsp(), EVL_CLASS_PAR, "", section/*ref*/);  // Only those that are non-CONST
     for (AstNode* nodep = modp->stmtsp(); nodep; nodep = nodep->nextp()) {
         if (const AstVar* varp = VN_CAST(nodep, Var)) {
             if (varp->isParam() && (varp->isUsedParam() || varp->isSigPublic())) {
+                if (section != "") { puts(section); section = ""; }
                 UASSERT_OBJ(varp->valuep(), nodep, "No init for a param?");
                 // These should be static const values, however microsloth VC++ doesn't
                 // support them.  They also cause problems with GDB under GCC2.95.
@@ -2798,8 +2806,8 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
 
     emitTextSection(AstType::atScInt);
 
-    puts("\n// API METHODS\n");
     if (modp->isTop()) {
+        puts("\n// API METHODS\n");
         if (optSystemC()) ofp()->putsPrivate(true);  ///< eval() is invoked by our sensitive() calls.
         else puts("/// Evaluate the model.  Application must call when inputs change.\n");
         puts("void eval();\n");
@@ -2838,7 +2846,9 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
         puts("void "+protect("__Vdeserialize")+"(VerilatedDeserialize& os);\n");
     }
 
-    puts("} VL_ATTR_ALIGNED(128);\n");
+    puts("}");
+    if (!VN_IS(modp, Class)) puts(" VL_ATTR_ALIGNED(VL_CACHE_LINE_BYTES)");
+    puts(";\n");
 
     emitIntFuncDecls(modp, false);
 
@@ -2855,9 +2865,6 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
              + "Verilated::quiesce(); rhs."
              + protect("__Vdeserialize") + "(os); return os; }\n");
     }
-
-    // finish up h-file
-    ofp()->putsEndGuard();
 }
 
 //----------------------------------------------------------------------
@@ -2885,10 +2892,8 @@ void EmitCImp::emitImpTop(AstNodeModule* fileModp) {
 void EmitCImp::emitImp(AstNodeModule* modp) {
     if (m_slow) {
         puts("\n//--------------------\n");
-        puts("// STATIC VARIABLES\n\n");
-        emitVarList(modp->stmtsp(), EVL_CLASS_ALL, prefixNameProtect(modp));
-
-        puts("\n//--------------------\n");
+        string section;
+        emitVarList(modp->stmtsp(), EVL_CLASS_ALL, prefixNameProtect(modp), section/*ref*/);
         emitCtorImp(modp);
         if (!VN_IS(modp, Class)) emitConfigureImp(modp);
         emitDestructorImp(modp);
@@ -2931,7 +2936,22 @@ void EmitCImp::maybeSplit(AstNodeModule* fileModp) {
     splitSizeInc(10);  // Even blank functions get a file with a low csplit
 }
 
-void EmitCImp::main(AstNodeModule* modp, bool slow, bool fast) {
+void EmitCImp::mainInt(AstNodeModule* modp) {
+    AstNodeModule* fileModp = modp;  // Filename constructed using this module
+    m_modp = modp;
+    m_slow = true;
+    m_fast = true;
+
+    UINFO(5, "  Emitting " << prefixNameProtect(modp) << endl);
+
+    m_ofp = newOutCFile(fileModp, false/*slow*/, false/*source*/);
+    emitIntTop(modp);
+    emitInt(modp);
+    ofp()->putsEndGuard();
+    VL_DO_CLEAR(delete m_ofp, m_ofp = NULL);
+}
+
+void EmitCImp::mainImp(AstNodeModule* modp, bool slow, bool fast) {
     // Output a module
     AstNodeModule* fileModp = modp;  // Filename constructed using this module
     m_modp = modp;
@@ -2939,12 +2959,6 @@ void EmitCImp::main(AstNodeModule* modp, bool slow, bool fast) {
     m_fast = fast;
 
     UINFO(5, "  Emitting " << prefixNameProtect(modp) << endl);
-
-    if (m_fast) {
-        m_ofp = newOutCFile(fileModp, !m_fast, false/*source*/);
-        emitInt(modp);
-        VL_DO_CLEAR(delete m_ofp, m_ofp = NULL);
-    }
 
     m_ofp = newOutCFile(fileModp, !m_fast, true/*source*/);
     emitImpTop(fileModp);
@@ -3381,16 +3395,23 @@ class EmitCTrace : EmitCStmts {
             } else if (nodep->funcType() == AstCFuncType::TRACE_CHANGE_SUB) {
             } else nodep->v3fatalSrc("Bad Case");
 
-            if (nodep->initsp()) putsDecoration("// Variables\n");
-            emitVarList(nodep->initsp(), EVL_FUNC_ALL, "");
-            iterateAndNextNull(nodep->initsp());
+            if (nodep->initsp()) {
+                string section;
+                putsDecoration("// Variables\n");
+                emitVarList(nodep->initsp(), EVL_FUNC_ALL, "", section /*ref*/);
+                iterateAndNextNull(nodep->initsp());
+            }
 
-            putsDecoration("// Body\n");
-            puts("{\n");
-            iterateAndNextNull(nodep->stmtsp());
-            puts("}\n");
-            if (nodep->finalsp()) putsDecoration("// Final\n");
-            iterateAndNextNull(nodep->finalsp());
+            if (nodep->stmtsp()) {
+                putsDecoration("// Body\n");
+                puts("{\n");
+                iterateAndNextNull(nodep->stmtsp());
+                puts("}\n");
+            }
+            if (nodep->finalsp()) {
+                putsDecoration("// Final\n");
+                iterateAndNextNull(nodep->finalsp());
+            }
             puts("}\n");
         }
         m_funcp = NULL;
@@ -3449,12 +3470,13 @@ void V3EmitC::emitc() {
     // Process each module in turn
     for (AstNodeModule* nodep = v3Global.rootp()->modulesp();
          nodep; nodep = VN_CAST(nodep->nextp(), NodeModule)) {
-        if (VN_IS(nodep, Class)) {  // Imped with ClassPackage
-        } else if (v3Global.opt.outputSplit()) {
-            { EmitCImp fast; fast.main(nodep, false, true); }
-            { EmitCImp slow; slow.main(nodep, true, false); }
+        if (VN_IS(nodep, Class)) continue;  // Imped with ClassPackage
+        { EmitCImp cint; cint.mainInt(nodep); }
+        if (v3Global.opt.outputSplit()) {
+            { EmitCImp fast; fast.mainImp(nodep, false, true); }
+            { EmitCImp slow; slow.mainImp(nodep, true, false); }
         } else {
-            { EmitCImp both; both.main(nodep, true, true); }
+            { EmitCImp both; both.mainImp(nodep, true, true); }
         }
     }
 }
