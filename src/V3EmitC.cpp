@@ -1533,42 +1533,6 @@ class EmitCImp : EmitCStmts {
         return "";
     }
 
-    void emitClassImp(AstClass* nodep) {
-        // FIXME elsehwere make AstCFunc and inside use AstText or something
-        puts("std::string " + prefixNameProtect(nodep) + "::to_string() const {\n");
-        puts(  "return std::string(\"`{\") + to_string_middle() + \"}\";\n");
-        puts("}\n");
-        puts("std::string " + prefixNameProtect(nodep) + "::to_string_middle() const {\n");
-        puts(  "std::string out;\n");
-        std::string comma;
-        for (AstNode* itemp = nodep->membersp(); itemp; itemp = itemp->nextp()) {
-            if (VN_IS(itemp, Var)) {
-                puts("out += \"");
-                puts(comma);
-                puts(itemp->origNameProtect());
-                puts(":\" + VL_TO_STRING(");
-                puts(itemp->nameProtect());
-                puts(");\n");
-                comma = ", ";
-                nodep->user1(true);  // So what we extend dumps this
-            }
-        }
-        if (nodep->extendsp() && nodep->extendsp()->classp()->user1()) {
-            puts("out += ");
-            if (!comma.empty()) puts("\", \"+ ");
-            comma = ", ";
-            puts(nodep->extendsp()->dtypep()->nameProtect());
-            puts("::to_string_middle();\n");
-            nodep->user1(true);  // So what we extend dumps this
-        }
-        puts(  "return out;\n");
-        puts("}\n");
-        puts("std::string VL_TO_STRING(const VlClassRef<" + prefixNameProtect(nodep)
-             + ">& obj) {\n");
-        puts(  "return (obj ? obj->to_string() : \"null\");\n");
-        puts("}\n");
-    }
-
     void emitCellCtors(AstNodeModule* modp);
     void emitSensitives();
     // Medium level
@@ -2667,18 +2631,15 @@ void EmitCImp::emitIntTop(AstNodeModule* modp) {
     if (v3Global.needHInlines()) {  // Set by V3EmitCInlines; should have been called before us
         puts("#include \"" + topClassName() + "__Inlines.h\"\n");
     }
-    if (v3Global.needClasses()) {
-        puts("#include \"" + classesFilename() + "Fwd.h\"\n");
-    }
     if (v3Global.dpi()) {
         // do this before including our main .h file so that any references to
         // types defined in svdpi.h are available
         puts("#include \"" + topClassName() + "__Dpi.h\"\n");
     }
-    puts("\n");
 }
 
 void EmitCImp::emitInt(AstNodeModule* modp) {
+    puts("\n//==========\n\n");
     emitModCUse(modp, VUseType::INT_INCLUDE);
 
     // Declare foreign instances up front to make C++ happy
@@ -2688,7 +2649,11 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
     puts("\n//----------\n\n");
     emitTextSection(AstType::atScHdr);
 
-    if (optSystemC() && modp->isTop()) {
+    if (AstClass* classp = VN_CAST(modp, Class)) {
+        puts("class " + prefixNameProtect(modp));
+        if (classp->extendsp()) puts(" : public " + classp->extendsp()->classp()->nameProtect());
+        puts(" {\n");
+    } else if (optSystemC() && modp->isTop()) {
         puts("SC_MODULE(" + prefixNameProtect(modp) + ") {\n");
     } else {
         puts("VL_MODULE(" + prefixNameProtect(modp) + ") {\n");
@@ -2774,7 +2739,9 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
     ofp()->resetPrivate();
     // We don't need a private copy constructor, as VerilatedModule has one for us.
     ofp()->putsPrivate(true);
-    puts("VL_UNCOPYABLE(" + prefixNameProtect(modp) + ");  ///< Copying not allowed\n");
+    if (!VN_IS(modp, Class)) {
+        puts("VL_UNCOPYABLE(" + prefixNameProtect(modp) + ");  ///< Copying not allowed\n");
+    }
 
     ofp()->putsPrivate(false);  // public:
     if (optSystemC() && modp->isTop()) {
@@ -2789,7 +2756,12 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
             puts("/// The special name "" may be used to make a wrapper with a\n");
             puts("/// single model invisible with respect to DPI scope names.\n");
         }
-        puts(prefixNameProtect(modp) + "(const char* name = \"TOP\");\n");
+        if (VN_IS(modp, Class)) {
+            // TODO move all constructor definition to e.g. V3CUse
+            puts(prefixNameProtect(modp) + "();\n");
+        } else {
+            puts(prefixNameProtect(modp) + "(const char* name = \"TOP\");\n");
+        }
         if (modp->isTop()) {
             puts("/// Destroy the model; called (often implicitly) by application code\n");
         }
@@ -2826,12 +2798,15 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
              +"("+EmitCBaseVisitor::symClassVar()+");\n");
     }
 
-    ofp()->putsPrivate(false);  // public:
-    puts("void "+protect("__Vconfigure")+"("+symClassName()+"* symsp, bool first);\n");
+    if (!VN_IS(modp, Class)) {
+        ofp()->putsPrivate(false);  // public:
+        puts("void "+protect("__Vconfigure")+"("+symClassName()+"* symsp, bool first);\n");
+    }
 
+    ofp()->putsPrivate(false);  // public:
     emitIntFuncDecls(modp, true);
 
-    if (v3Global.opt.trace()) {
+    if (v3Global.opt.trace() && !VN_IS(modp, Class)) {
         ofp()->putsPrivate(false);  // public:
         puts("static void "+protect("traceInit")+"("+v3Global.opt.traceClassBase()
              +"* vcdp, void* userthis, uint32_t code);\n");
@@ -2850,6 +2825,7 @@ void EmitCImp::emitInt(AstNodeModule* modp) {
     if (!VN_IS(modp, Class)) puts(" VL_ATTR_ALIGNED(VL_CACHE_LINE_BYTES)");
     puts(";\n");
 
+    puts("\n//----------\n\n");
     emitIntFuncDecls(modp, false);
 
     // Save/restore
@@ -2873,9 +2849,6 @@ void EmitCImp::emitImpTop(AstNodeModule* fileModp) {
     puts("\n");
     puts("#include \"" + prefixNameProtect(fileModp) + ".h\"\n");
     puts("#include \"" + symClassName() + ".h\"\n");
-    if (v3Global.needClasses()) {
-        puts("#include \"" + classesFilename() + ".h\"\n");
-    }
 
     if (v3Global.dpi()) {
         puts("\n");
@@ -2885,19 +2858,17 @@ void EmitCImp::emitImpTop(AstNodeModule* fileModp) {
     emitModCUse(fileModp, VUseType::IMP_INCLUDE);
     emitModCUse(fileModp, VUseType::IMP_FWD_CLASS);
 
-    puts("\n");
     emitTextSection(AstType::atScImpHdr);
 }
 
 void EmitCImp::emitImp(AstNodeModule* modp) {
+    puts("\n//==========\n\n");
     if (m_slow) {
-        puts("\n//--------------------\n");
         string section;
         emitVarList(modp->stmtsp(), EVL_CLASS_ALL, prefixNameProtect(modp), section/*ref*/);
         emitCtorImp(modp);
         if (!VN_IS(modp, Class)) emitConfigureImp(modp);
         emitDestructorImp(modp);
-        if (AstClass* classp = VN_CAST(modp, Class)) emitClassImp(classp);
         emitSavableImp(modp);
         emitCoverageImp(modp);
     }
@@ -2906,15 +2877,11 @@ void EmitCImp::emitImp(AstNodeModule* modp) {
         emitTextSection(AstType::atScImp);
 
         if (modp->isTop()) {
-            puts("\n//--------------------\n");
-            puts("\n");
             emitWrapEval(modp);
         }
     }
 
     // Blocks
-    puts("\n//--------------------\n");
-    puts("// Internal Methods\n");
     for (AstNode* nodep = modp->stmtsp(); nodep; nodep = nodep->nextp()) {
         if (AstCFunc* funcp = VN_CAST(nodep, CFunc)) {
             maybeSplit(modp);
@@ -2947,6 +2914,12 @@ void EmitCImp::mainInt(AstNodeModule* modp) {
     m_ofp = newOutCFile(fileModp, false/*slow*/, false/*source*/);
     emitIntTop(modp);
     emitInt(modp);
+    if (AstClassPackage* packagep = VN_CAST(modp, ClassPackage)) {
+        // Put the non-static class implementation in same h file for speed
+        m_modp = packagep->classp();
+        emitInt(packagep->classp());
+        m_modp = modp;
+    }
     ofp()->putsEndGuard();
     VL_DO_CLEAR(delete m_ofp, m_ofp = NULL);
 }
@@ -2993,58 +2966,6 @@ void EmitCImp::mainImp(AstNodeModule* modp, bool slow, bool fast) {
     }
     VL_DO_CLEAR(delete m_ofp, m_ofp = NULL);
 }
-
-//######################################################################
-// Classes interface
-
-class EmitCClassesInt : EmitCStmts {
-    virtual void visit(AstClass* nodep) VL_OVERRIDE {
-        ofp()->resetPrivate();
-        puts("\n");
-        puts("class " + prefixNameProtect(nodep));
-        if (nodep->extendsp()) puts(" : public " + nodep->extendsp()->classp()->nameProtect());
-        puts(" {\n");
-        ofp()->putsPrivate(false);
-        puts("// CONSTRUCTORS\n");
-        puts(prefixNameProtect(nodep) + "();\n");
-        puts("~" + prefixNameProtect(nodep) + "();\n");
-        if (nodep->membersp()) {
-            puts("// MEMBERS\n");
-            emitVarList(nodep->membersp(), EVL_FUNC_ALL, "");
-        }
-
-        ofp()->putsPrivate(false);
-        puts(  "// INTERNAL METHODS\n");
-        emitIntFuncDecls(nodep, true);
-        ofp()->putsPrivate(false);
-        puts(  "std::string to_string() const;\n");
-        puts(  "std::string to_string_middle() const;\n");
-
-        puts("};\n");
-        puts("std::string VL_TO_STRING(const VlClassRef<" + prefixNameProtect(nodep) + ">& obj);\n");
-    }
-public:
-    explicit EmitCClassesInt() {}
-    virtual ~EmitCClassesInt() {}
-    void main() {
-        // Put out the file
-        m_ofp = new V3OutCFile(v3Global.opt.makeDir() + "/" + classesFilename() + ".h");
-        m_ofp->putsHeader();
-        m_ofp->puts("// DESCR"
-                    "IPTION: Verilator output: User class interface header\n");
-        ofp()->putsGuard();
-
-        puts("\n");
-        puts("class " + EmitCBaseVisitor::symClassName() + ";\n");
-        // Can't include symClassName().h as that includes this file
-
-        for (AstNode* nodep = v3Global.rootp()->modulesp(); nodep; nodep = nodep->nextp()) {
-            if (AstClass* classp = VN_CAST(nodep, Class)) iterate(classp);
-        }
-
-        ofp()->putsEndGuard();
-    }
-};
 
 //######################################################################
 // Tracing routines
@@ -3479,11 +3400,6 @@ void V3EmitC::emitc() {
             { EmitCImp both; both.mainImp(nodep, true, true); }
         }
     }
-}
-
-void V3EmitC::emitcClasses() {
-    if (!v3Global.needClasses()) return;
-    { EmitCClassesInt c; c.main(); }
 }
 
 void V3EmitC::emitcTrace() {

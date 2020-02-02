@@ -77,7 +77,6 @@ class V3Global {
     int         m_debugFileNumber;      // Number to append to debug files created
     bool        m_assertDTypesResolved; // Tree should have dtypep()'s
     bool        m_constRemoveXs;        // Const needs to strip any Xs
-    bool        m_needClasses;          // Need __Classes file
     bool        m_needHInlines;         // Need __Inlines file
     bool        m_needHeavy;            // Need verilated_heavy.h include
     bool        m_dpi;                  // Need __Dpi include files
@@ -93,7 +92,6 @@ public:
         m_widthMinUsage = VWidthMinUsage::LINT_WIDTH;
         m_assertDTypesResolved = false;
         m_constRemoveXs = false;
-        m_needClasses = false;
         m_needHInlines = false;
         m_needHeavy = false;
         m_dpi = false;
@@ -121,8 +119,6 @@ public:
         char digits[100]; sprintf(digits, "%03d", m_debugFileNumber);
         return opt.makeDir()+"/"+opt.prefix()+"_"+digits+"_"+nameComment;
     }
-    bool needClasses() const { return m_needClasses; }
-    void needClasses(bool flag) { m_needClasses = flag; }
     bool needHInlines() const { return m_needHInlines; }
     void needHInlines(bool flag) { m_needHInlines=flag; }
     bool needHeavy() const { return m_needHeavy; }

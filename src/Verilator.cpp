@@ -476,7 +476,6 @@ static void process() {
         // emitcInlines is first, as it may set needHInlines which other emitters read
         V3EmitC::emitcInlines();
         V3EmitC::emitcSyms();
-        V3EmitC::emitcClasses();
         V3EmitC::emitcTrace();
     } else if (v3Global.opt.dpiHdrOnly()) {
         V3EmitC::emitcSyms(true);

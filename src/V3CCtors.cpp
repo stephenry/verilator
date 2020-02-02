@@ -63,7 +63,7 @@ public:
                                    m_basename+"_"+cvtToStr(++m_funcNum), NULL, "void");
             m_funcp->isStatic(false);
             m_funcp->declPrivate(true);
-            m_funcp->slow(true);
+            m_funcp->slow(!VN_IS(m_modp, Class));  // Only classes construct on fast path
             m_funcp->argTypes(m_argsp);
             m_modp->addStmtp(m_funcp);
 
@@ -90,7 +90,7 @@ public:
         m_tlFuncp = new AstCFunc(nodep->fileline(), basename, NULL, "void");
         m_tlFuncp->declPrivate(true);
         m_tlFuncp->isStatic(false);
-        m_tlFuncp->slow(true);
+        m_tlFuncp->slow(!VN_IS(m_modp, Class));  // Only classes construct on fast path
         m_tlFuncp->argTypes(m_argsp);
         if (stmt != "") {
             m_tlFuncp->addStmtsp(new AstCStmt(nodep->fileline(), stmt));

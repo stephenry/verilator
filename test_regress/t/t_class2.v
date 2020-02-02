@@ -11,11 +11,15 @@ class DeadInMod;
    int memberdead;
 endclass
 endmodule
-
+package Pkg;
+   typedef enum { ENUMP_VAL = 33 } enump_t;
+endpackage
+   
 module t (/*AUTOARG*/);
 class Cls;
    int imembera;
    int imemberb;
+   typedef enum { ENUM_VAL = 22 } enum_t;
 endclass : Cls
 
    Cls c;
@@ -40,6 +44,9 @@ endclass : Cls
       if (d.imembera != 11) $stop;
       if (c.imemberb != 20) $stop;
       if (d.imemberb != 21) $stop;
+      if (Pkg::ENUMP_VAL != 33) $stop;
+      if (Cls::ENUM_VAL != 22) $stop;
+      if (c.ENUM_VAL != 22) $stop;
       $write("*-* All Finished *-*\n");
       $finish;
    end
