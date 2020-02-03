@@ -1401,6 +1401,9 @@ void AstCFunc::dump(std::ostream& str) const {
     if (dpiImport()) str<<" [DPII]";
     if (dpiExport()) str<<" [DPIX]";
     if (dpiExportWrapper()) str<<" [DPIXWR]";
+    if (isConstructor()) str<<" [CTOR]";
+    if (isDestructor()) str<<" [DTOR]";
+    if (isVirtual()) str<<" [VIRT]";
 }
 void AstCUse::dump(std::ostream& str) const {
     this->AstNode::dump(str);

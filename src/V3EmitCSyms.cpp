@@ -110,7 +110,10 @@ class EmitCSyms : EmitCBaseVisitor {
 
     void nameCheck(AstNode* nodep) {
         // Prevent GCC compile time error; name check all things that reach C++ code
-        if (nodep->name() != "") {
+        if (nodep->name() != ""
+            && !(VN_IS(nodep, CFunc)
+                 && (VN_CAST(nodep, CFunc)->isConstructor()
+                     || VN_CAST(nodep, CFunc)->isDestructor()))) {
             string rsvd = m_words.isKeyword(nodep->name());
             if (rsvd != "") {
                 // Generally V3Name should find all of these and throw SYMRSVDWORD.

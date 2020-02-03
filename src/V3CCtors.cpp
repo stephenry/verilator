@@ -53,6 +53,7 @@ private:
     int                 m_funcNum;      // Function number being built
 
 public:
+    AstCFunc* builtFuncp() const { return m_tlFuncp; }
     void add(AstNode* nodep) {
         if (v3Global.opt.outputSplitCFuncs()
             && v3Global.opt.outputSplitCFuncs() < m_numStmts) {
@@ -150,8 +151,10 @@ void V3CCtors::cctorsAll() {
     for (AstNodeModule* modp = v3Global.rootp()->modulesp();
          modp; modp = VN_CAST(modp->nextp(), NodeModule)) {
         // Process each module in turn
+        AstCFunc* varResetFuncp;
         {
             V3CCtorsVisitor var_reset (modp, "_ctor_var_reset");
+            varResetFuncp = var_reset.builtFuncp();
             for (AstNode* np = modp->stmtsp(); np; np = np->nextp()) {
                 if (AstVar* varp = VN_CAST(np, Var)) {
                     if (!varp->isIfaceParent() && !varp->isIfaceRef()
@@ -175,6 +178,21 @@ void V3CCtors::cctorsAll() {
                     np = backp;
                 }
             }
+        }
+        if (VN_IS(modp, Class)) {
+            AstCFunc* funcp = new AstCFunc(modp->fileline(), "new", NULL, "");
+            funcp->isConstructor(true);
+            funcp->isStatic(false);
+            funcp->slow(false);
+            modp->addStmtp(funcp);
+            funcp->addStmtsp(new AstCCall(varResetFuncp->fileline(), varResetFuncp));
+        }
+        if (VN_IS(modp, Class)) {
+            AstCFunc* funcp = new AstCFunc(modp->fileline(), "~", NULL, "");
+            funcp->isDestructor(true);
+            funcp->isStatic(false);
+            funcp->slow(false);
+            modp->addStmtp(funcp);
         }
     }
 }
