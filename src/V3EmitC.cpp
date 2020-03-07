@@ -852,6 +852,12 @@ public:
         iterateAndNextNull(nodep->argsp());
         puts(")");
     }
+    virtual void visit(AstNewCopy* nodep) VL_OVERRIDE {
+        puts("std::make_shared<" + prefixNameProtect(nodep->dtypep()) + ">(");
+        puts("*");  // i.e. make into a reference
+        iterateAndNextNull(nodep->rhsp());
+        puts(")");
+    }
     virtual void visit(AstSel* nodep) VL_OVERRIDE {
         // Note ASSIGN checks for this on a LHS
         emitOpName(nodep, nodep->emitC(), nodep->fromp(), nodep->lsbp(), nodep->thsp());

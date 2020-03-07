@@ -2298,6 +2298,7 @@ private:
     bool        m_dpiContext:1;  // DPI import context
     bool        m_dpiOpenChild:1;  // DPI import open array child wrapper
     bool        m_dpiTask:1;    // DPI import task (vs. void function)
+    bool        m_isConstructor:1;  // Class constructor
     bool        m_pure:1;       // DPI import pure (vs. virtual pure)
 public:
     AstNodeFTask(AstType t, FileLine* fl, const string& name, AstNode* stmtsp)
@@ -2306,7 +2307,7 @@ public:
         , m_dpiOpenParent(0), m_taskPublic(false)
         , m_attrIsolateAssign(false), m_classMethod(false), m_prototype(false)
         , m_dpiExport(false), m_dpiImport(false), m_dpiContext(false)
-        , m_dpiOpenChild(false), m_dpiTask(false), m_pure(false) {
+        , m_dpiOpenChild(false), m_dpiTask(false), m_isConstructor(false), m_pure(false) {
         addNOp3p(stmtsp);
         cname(name);  // Might be overridden by dpi import/export
     }
@@ -2351,6 +2352,8 @@ public:
     bool dpiOpenChild() const { return m_dpiOpenChild; }
     void dpiTask(bool flag) { m_dpiTask = flag; }
     bool dpiTask() const { return m_dpiTask; }
+    void isConstructor(bool flag) { m_isConstructor = flag; }
+    bool isConstructor() const { return m_isConstructor; }
     void pure(bool flag) { m_pure = flag; }
     bool pure() const { return m_pure; }
 };

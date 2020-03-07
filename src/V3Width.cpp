@@ -2431,7 +2431,19 @@ private:
     }
     virtual void visit(AstNewCopy* nodep) VL_OVERRIDE {
         if (nodep->didWidthAndSet()) return;
-        nodep->v3error("Unsupported: new-as-copy");
+        AstClassRefDType* refp = VN_CAST(m_vup->dtypeNullp(), ClassRefDType);
+        if (!refp) {  // e.g. int a = new;
+            if (refp) UINFO(1, "Got refp "<<refp<<endl);
+            nodep->v3error("new() not expected in this context");
+            return;
+        }
+        nodep->dtypep(refp);
+        userIterateChildren(nodep, WidthVP(SELF, BOTH).p());
+        if (!similarDTypeRecurse(nodep->dtypep(), nodep->rhsp()->dtypep())) {
+            nodep->rhsp()->v3error("New-as-copier passed different data type '"
+                                   << nodep->dtypep()->prettyTypeName() << "' then expected '"
+                                   << nodep->rhsp()->dtypep()->prettyTypeName() << "'");
+        }
     }
     virtual void visit(AstNewDynamic* nodep) VL_OVERRIDE {
         if (nodep->didWidthAndSet()) return;
@@ -3348,7 +3360,8 @@ private:
     }
     virtual void visit(AstNodeFTask* nodep) VL_OVERRIDE {
         // Grab width from the output variable (if it's a function)
-        if (nodep->name() == "new") nodep->v3error("Unsupported: new constructor");
+        //FIXME
+        if (nodep->isConstructor()) nodep->v3error("Unsupported: new constructor");
         if (nodep->didWidth()) return;
         if (nodep->doingWidth()) {
             nodep->v3error("Unsupported: Recursive function or task call");
@@ -3360,7 +3373,10 @@ private:
         nodep->doingWidth(true);  // Would use user1 etc, but V3Width called from too many places to spend a user
         m_ftaskp = nodep;
         userIterateChildren(nodep, NULL);
-        if (nodep->fvarp()) {
+        if (nodep->isConstructor()) {
+            // Pretend it's void so less special casing needed when look at dtypes
+            nodep->dtypeSetVoid();
+        } else if (nodep->fvarp()) {
             m_funcp = VN_CAST(nodep, Func);
             UASSERT_OBJ(m_funcp, nodep, "FTask with function variable, but isn't a function");
             nodep->dtypeFrom(nodep->fvarp());  // Which will get it from fvarp()->dtypep()

@@ -1465,9 +1465,7 @@ class AstMethodCall : public AstNodeFTaskRef {
     // A reference to a member task (or function)
     // PARENTS: stmt/math
     // Not all calls are statments vs math.  AstNodeStmt needs isStatement() to deal.
-private:
     // Don't need the class we are extracting from, as the "fromp()"'s datatype can get us to it
-    AstNodeFTask* m_ftaskp;  // Link to the function
 public:
     AstMethodCall(FileLine* fl, AstNode* fromp, VFlagChildDType, const string& name,
                   AstNode* pinsp)

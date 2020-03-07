@@ -3502,13 +3502,16 @@ funcId<ftaskp>:			// IEEE: function_data_type_or_implicit + part of function_bod
 funcIdNew<ftaskp>:		// IEEE: from class_constructor_declaration
 		yNEW__ETC
 			{ $$ = new AstFunc($<fl>1, "new", NULL, NULL);
+			  $$->isConstructor(true);
 			  SYMP->pushNewUnder($$, NULL); }
 	| 	yNEW__PAREN
 			{ $$ = new AstFunc($<fl>1, "new", NULL, NULL);
+			  $$->isConstructor(true);
 			  SYMP->pushNewUnder($$, NULL); }
 	|	class_scopeWithoutId yNEW__PAREN
 			{ $$ = new AstFunc($<fl>2, "new", NULL, NULL);
 			  BBUNSUP($<fl>2, "Unsupported: scoped new constructor");
+			  $$->isConstructor(true);
 			  SYMP->pushNewUnder($$, NULL); }
 	;
 

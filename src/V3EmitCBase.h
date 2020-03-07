@@ -52,7 +52,6 @@ public:
     static string protectWordsIf(const string& name, bool doIt) {
         return VIdProtect::protectWordsIf(name, doIt); }
     static string ifNoProtect(const string& in) { return v3Global.opt.protectIds() ? "" : in; }
-    static string classesFilename() { return v3Global.opt.prefix() + "_" + protect("_Classes"); }
     static string symClassName() { return v3Global.opt.prefix()+"_"+protect("_Syms"); }
     static string symClassVar()  { return symClassName()+"* __restrict vlSymsp"; }
     static string symTopAssign() {
