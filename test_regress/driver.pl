@@ -565,7 +565,7 @@ sub new {
         ghdl_run_flags => [],
         # IV
         iv => 0,
-        iv_flags => [split(/\s+/,"+define+iverilog -o $self->{obj_dir}/simiv")],
+        iv_flags => [split(/\s+/,"+define+iverilog -g2012 -o $self->{obj_dir}/simiv")],
         iv_flags2 => [],  # Overridden in some sim files
         iv_pli => 0,  # need to use pli
         iv_run_flags => [],
@@ -1048,7 +1048,7 @@ sub compile {
                                 "-DTEST_VERBOSE=\"".($self->{verbose} ? 1 : 0)."\"",
                                 "-DTEST_SYSTEMC=\"" .($self->sc ? 1 : 0). "\"",
                                 "-DCMAKE_PREFIX_PATH=\"".(($ENV{SYSTEMC_INCLUDE}||$ENV{SYSTEMC}||'')."/..\""),
-                                "-DTEST_OPT_FAST=\"" . ($param{benchmark}?"-O2":"") . "\"",
+                                "-DTEST_OPT_FAST=\"" . ($param{benchmark} ? "-Os" : "") . "\"",
                                 "-DTEST_VERILATION=\"" . $::Opt_Verilation . "\"",
                         ]);
             return 1 if $self->errors || $self->skips || $self->unsupporteds;
@@ -1066,7 +1066,7 @@ sub compile {
                                 "TEST_OBJ_DIR=$self->{obj_dir}",
                                 "CPPFLAGS_DRIVER=-D".uc($self->{name}),
                                 ($self->{verbose} ? "CPPFLAGS_DRIVER2=-DTEST_VERBOSE=1":""),
-                                ($param{benchmark}?"OPT_FAST=-O2":""),
+                                ($param{benchmark} ? "OPT_FAST=-Os" : ""),
                                 "$self->{VM_PREFIX}",  # bypass default rule, as we don't need archive
                                 ($param{make_flags}||""),
                         ]);
@@ -1498,10 +1498,9 @@ sub _run {
 
     # Read the log file a couple of times to allow for NFS delays
     if ($param{check_finished} || $param{expect}) {
-        my $tries = $self->tries;
-        for (my $try=$tries-1; $try>=0; $try--) {
-            sleep 1 if ($try!=$tries-1);
-            my $moretry = $try!=0;
+        for (my $try = $self->tries - 1; $try >= 0; $try--) {
+            sleep 1 if ($try != $self->tries - 1);
+            my $moretry = $try != 0;
 
             my $fh = IO::File->new("<$param{logfile}");
             next if !$fh && $moretry;
@@ -1725,7 +1724,7 @@ sub _make_main {
     }
     $fh->print("\n");
 
-    print $fh "    delete topp; topp=NULL;\n";
+    print $fh "    VL_DO_DANGLING(delete topp, topp);\n";
     print $fh "    exit(0L);\n";
     print $fh "}\n";
     $fh->close();
@@ -1743,7 +1742,7 @@ sub _print_advance_time {
 
     if ($self->sc) {
         print $fh "#if (SYSTEMC_VERSION>=20070314)\n";
-        print $fh "        sc_start(${time},SC_NS);\n";
+        print $fh "        sc_start(${time}, SC_NS);\n";
         print $fh "#else\n";
         print $fh "        sc_start(${time});\n";
         print $fh "#endif\n";
@@ -1949,11 +1948,10 @@ sub files_identical {
     my $fn1_is_logfile = shift;
     return 1 if $self->errors || $self->skips || $self->unsupporteds;
 
-    my $tries = $self->tries;
   try:
-    for (my $try=$tries-1; $try>=0; $try--) {
-        sleep 1 if ($try!=$tries-1);
-        my $moretry = $try!=0;
+    for (my $try = $self->tries - 1; $try >= 0; $try--) {
+        sleep 1 if ($try != $self->tries - 1);
+        my $moretry = $try != 0;
 
         my $f1 = IO::File->new("<$fn1");
         my $f2 = IO::File->new("<$fn2");

@@ -66,6 +66,7 @@ private:
 public:
     explicit VerilatedFst(void* fst=NULL);
     ~VerilatedFst() { if (m_fst == NULL) { fstWriterClose(m_fst); } }
+    void changeThread() { m_assertOne.changeThread(); }
     bool isOpen() const { return m_fst != NULL; }
     void open(const char* filename) VL_MT_UNSAFE;
     void flush() VL_MT_UNSAFE { fstWriterFlushContext(m_fst); }
@@ -167,10 +168,10 @@ public:
     void fullArray(vluint32_t code, const vluint32_t* newval, int bits) {
         chgArray(code, newval, bits); }
 
-    void declTriBit   (vluint32_t code, const char* name, int arraynum);
-    void declTriBus   (vluint32_t code, const char* name, int arraynum, int msb, int lsb);
-    void declTriQuad  (vluint32_t code, const char* name, int arraynum, int msb, int lsb);
-    void declTriArray (vluint32_t code, const char* name, int arraynum, int msb, int lsb);
+    void declTriBit(vluint32_t code, const char* name, int arraynum);
+    void declTriBus(vluint32_t code, const char* name, int arraynum, int msb, int lsb);
+    void declTriQuad(vluint32_t code, const char* name, int arraynum, int msb, int lsb);
+    void declTriArray(vluint32_t code, const char* name, int arraynum, int msb, int lsb);
     void fullTriBit(vluint32_t code, const vluint32_t newval, const vluint32_t newtri);
     void fullTriBus(vluint32_t code, const vluint32_t newval, const vluint32_t newtri, int bits);
     void fullTriQuad(vluint32_t code, const vluint64_t newval, const vluint32_t newtri, int bits);
@@ -198,7 +199,9 @@ class VerilatedFstC {
     VL_UNCOPYABLE(VerilatedFstC);
 public:
     explicit VerilatedFstC(void* filep=NULL) : m_sptrace(filep) {}
-    ~VerilatedFstC() {}
+    ~VerilatedFstC() { close(); }
+    /// Routines can only be called from one thread; allow next call from different thread
+    void changeThread() { spTrace()->changeThread(); }
 public:
     // ACCESSORS
     /// Is file open?

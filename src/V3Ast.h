@@ -117,7 +117,7 @@ public:
             "UNSIGNED", "SIGNED", "NOSIGN"
         };
         return names[m_e];
-    };
+    }
     inline AstNumeric() : m_e(UNSIGNED) {}
     // cppcheck-suppress noExplicitConstructor
     inline AstNumeric(en _e) : m_e(_e) {}
@@ -332,7 +332,8 @@ public:
         VAR_SC_BV,                      // V3LinkParse moves to AstVar::attrScBv
         VAR_SFORMAT,                    // V3LinkParse moves to AstVar::attrSFormat
         VAR_CLOCKER,                    // V3LinkParse moves to AstVar::attrClocker
-        VAR_NO_CLOCKER                  // V3LinkParse moves to AstVar::attrClocker
+        VAR_NO_CLOCKER,                 // V3LinkParse moves to AstVar::attrClocker
+        VAR_SPLIT_VAR                   // V3LinkParse moves to AstVar::attrSplitVar
     };
     enum en m_e;
     const char* ascii() const {
@@ -348,10 +349,10 @@ public:
             "VAR_BASE", "VAR_CLOCK", "VAR_CLOCK_ENABLE", "VAR_PUBLIC",
             "VAR_PUBLIC_FLAT", "VAR_PUBLIC_FLAT_RD", "VAR_PUBLIC_FLAT_RW",
             "VAR_ISOLATE_ASSIGNMENTS", "VAR_SC_BV", "VAR_SFORMAT", "VAR_CLOCKER",
-            "VAR_NO_CLOCKER"
+            "VAR_NO_CLOCKER", "VAR_SPLIT_VAR"
         };
         return names[m_e];
-    };
+    }
     inline AstAttrType() : m_e(ILLEGAL) {}
     // cppcheck-suppress noExplicitConstructor
     inline AstAttrType(en _e) : m_e(_e) {}
@@ -396,7 +397,7 @@ public:
             " MAX"
         };
         return names[m_e];
-    };
+    }
     const char* dpiType() const {
         static const char* const names[] = {
             "%E-unk",
@@ -409,7 +410,7 @@ public:
             " MAX"
         };
         return names[m_e];
-    };
+    }
     static void selfTest() {
         UASSERT(0==strcmp(AstBasicDTypeKwd(_ENUM_MAX).ascii(), " MAX"), "SelfTest: Enum mismatch");
         UASSERT(0==strcmp(AstBasicDTypeKwd(_ENUM_MAX).dpiType(), " MAX"), "SelfTest: Enum mismatch");
@@ -820,6 +821,32 @@ inline bool operator==(AstDisplayType::en lhs, const AstDisplayType& rhs) {
 
 //######################################################################
 
+class VDumpCtlType {
+public:
+    enum en { FILE, VARS, ALL, FLUSH, LIMIT, OFF, ON };
+    enum en m_e;
+    inline VDumpCtlType()
+        : m_e(ON) {}
+    // cppcheck-suppress noExplicitConstructor
+    inline VDumpCtlType(en _e)
+        : m_e(_e) {}
+    explicit inline VDumpCtlType(int _e)
+        : m_e(static_cast<en>(_e)) {}
+    operator en() const { return m_e; }
+    const char* ascii() const {
+        static const char* const names[] = {"$dumpfile", "$dumpvars", "$dumpall", "$dumpflush",
+                                            "$dumplimit", "$dumpoff", "$dumpon"};
+        return names[m_e];
+    }
+};
+inline bool operator==(const VDumpCtlType& lhs, const VDumpCtlType& rhs) {
+    return lhs.m_e == rhs.m_e;
+}
+inline bool operator==(const VDumpCtlType& lhs, VDumpCtlType::en rhs) { return lhs.m_e == rhs; }
+inline bool operator==(VDumpCtlType::en lhs, const VDumpCtlType& rhs) { return lhs == rhs.m_e; }
+
+//######################################################################
+
 class VParseRefExp {
 public:
     enum en {
@@ -1030,14 +1057,14 @@ protected:
         clearcnt(id, cntGblRef, userBusyRef);  // Includes a checkUse for us
         userBusyRef = false;
     }
-    static void clearcnt(int id, uint32_t& cntGblRef, bool& userBusyRef) {
+    static void clearcnt(int id, uint32_t& cntGblRef, const bool& userBusyRef) {
         UASSERT_STATIC(userBusyRef, "Clear of User"+cvtToStr(id)+"() not under AstUserInUse");
         // If this really fires and is real (after 2^32 edits???)
         // we could just walk the tree and clear manually
         ++cntGblRef;
         UASSERT_STATIC(cntGblRef, "User*() overflowed!");
     }
-    static void checkcnt(int id, uint32_t&, bool& userBusyRef) {
+    static void checkcnt(int id, uint32_t&, const bool& userBusyRef) {
         UASSERT_STATIC(userBusyRef, "Check of User"+cvtToStr(id)+"() failed, not under AstUserInUse");
     }
 };
@@ -1202,7 +1229,7 @@ public:
     explicit V3Hash(VNUser u) { m_both = u.toInt(); }
     V3Hash operator+= (const V3Hash& rh) {
         setBoth(depth()+rh.depth(), (hshval()*31+rh.hshval()));
-        return *this; };
+        return *this; }
     // Creating from raw data (sameHash functions)
     V3Hash() { setBoth(1, 0); }
     // cppcheck-suppress noExplicitConstructor

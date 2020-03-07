@@ -300,6 +300,17 @@ AstVar::VlArgTypeRecursed AstVar::vlArgTypeRecurse(bool forFunc, const AstNodeDT
         VlArgTypeRecursed info;
         info.m_oprefix = out;
         return info;
+    } else if (const AstDynArrayDType* adtypep = VN_CAST_CONST(dtypep, DynArrayDType)) {
+        VlArgTypeRecursed sub = vlArgTypeRecurse(forFunc, adtypep->subDTypep(), true);
+        string out = "VlQueue<";
+        out += sub.m_oprefix;
+        if (!sub.m_osuffix.empty() || !sub.m_oref.empty()) {
+            out += " " + sub.m_osuffix + sub.m_oref;
+        }
+        out += "> ";
+        VlArgTypeRecursed info;
+        info.m_oprefix = out;
+        return info;
     } else if (const AstQueueDType* adtypep = VN_CAST_CONST(dtypep, QueueDType)) {
         VlArgTypeRecursed sub = vlArgTypeRecurse(forFunc, adtypep->subDTypep(), true);
         VlArgTypeRecursed info;
@@ -656,7 +667,7 @@ std::pair<uint32_t,uint32_t> AstNodeDType::dimensions(bool includeBasic) {
         else if (const AstBasicDType* adtypep = VN_CAST(dtypep, BasicDType)) {
             if (includeBasic && (adtypep->isRanged() || adtypep->isString())) packed++;
         }
-        else if (const AstStructDType* sdtypep = VN_CAST(dtypep, StructDType)) {
+        else if (VN_IS(dtypep, StructDType)) {
             packed++;
         }
         break;
@@ -1234,6 +1245,13 @@ void AstAssocArrayDType::dumpSmall(std::ostream& str) const {
 string AstAssocArrayDType::prettyDTypeName() const {
     return subDTypep()->prettyDTypeName() + "[" + keyDTypep()->prettyDTypeName() + "]";
 }
+void AstDynArrayDType::dumpSmall(std::ostream& str) const {
+    this->AstNodeDType::dumpSmall(str);
+    str<<"[]";
+}
+string AstDynArrayDType::prettyDTypeName() const {
+    return subDTypep()->prettyDTypeName() + "[]";
+}
 void AstQueueDType::dumpSmall(std::ostream& str) const {
     this->AstNodeDType::dumpSmall(str);
     str<<"[queue]";
@@ -1350,6 +1368,7 @@ void AstBegin::dump(std::ostream& str) const {
     if (unnamed()) str<<" [UNNAMED]";
     if (generate()) str<<" [GEN]";
     if (genforp()) str<<" [GENFOR]";
+    if (implied()) str<<" [IMPLIED]";
 }
 void AstCoverDecl::dump(std::ostream& str) const {
     this->AstNode::dump(str);

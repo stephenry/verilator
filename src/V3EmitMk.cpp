@@ -85,12 +85,12 @@ public:
                         putMakeClassEntry(of, "verilated_cov.cpp");
                     }
                     if (v3Global.opt.trace()) {
-                        putMakeClassEntry(of, v3Global.opt.traceSourceName()+"_c.cpp");
+                        putMakeClassEntry(of, v3Global.opt.traceSourceBase() + "_c.cpp");
                         if (v3Global.opt.systemC()) {
                             if (v3Global.opt.traceFormat() != TraceFormat::VCD) {
                                 v3error("Unsupported: This trace format is not supported in SystemC, use VCD format.");
                             } else {
-                                putMakeClassEntry(of, v3Global.opt.traceSourceName()+"_sc.cpp");
+                                putMakeClassEntry(of, v3Global.opt.traceSourceLang() + ".cpp");
                             }
                         }
                     }
@@ -189,7 +189,7 @@ public:
             string cppfile = *it;
             of.puts("\t"+V3Os::filenameNonExt(cppfile)+" \\\n");
             string dir = V3Os::filenameDir(cppfile);
-            if (dirs.find(dir) == dirs.end()) dirs.insert(dir);
+            dirs.insert(dir);
         }
         of.puts("\n");
 

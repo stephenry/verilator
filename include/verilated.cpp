@@ -1603,6 +1603,25 @@ IData VL_ATOI_N(const std::string& str, int base) VL_PURE {
 }
 
 //===========================================================================
+// Dumping
+
+const char* vl_dumpctl_filenamep(bool setit, const std::string& filename) VL_MT_SAFE {
+    // This function performs both accessing and setting so it's easy to make an in-function static
+    static VL_THREAD_LOCAL std::string t_filename;
+    if (setit) {
+        t_filename = filename;
+    } else {
+        static VL_THREAD_LOCAL bool t_warned = false;
+        if (VL_UNLIKELY(t_filename.empty() && !t_warned)) {
+            t_warned = true;
+            VL_PRINTF_MT("%%Warning: $dumpvar ignored as not proceeded by $dumpfile\n");
+            return "";
+        }
+    }
+    return t_filename.c_str();
+}
+
+//===========================================================================
 // Readmem/writemem
 
 static const char* memhFormat(int nBits) {
@@ -1832,7 +1851,7 @@ void VL_READMEM_N(bool hex,  // Hex format, else binary
                   QData end  // Last row address to read
                   ) VL_MT_SAFE {
     QData addr_max = array_lsb + depth - 1;
-    if (start < array_lsb) start = array_lsb;
+    if (start < static_cast<QData>(array_lsb)) start = array_lsb;
     QData addr_end = end;
     if (addr_end > addr_max) addr_end = addr_max;
 
@@ -1883,7 +1902,7 @@ void VL_WRITEMEM_N(bool hex,  // Hex format, else binary
                    QData end  // Last address to write, or ~0 when not specified
                    ) VL_MT_SAFE {
     QData addr_max = array_lsb + depth - 1;
-    if (start < array_lsb) start = array_lsb;
+    if (start < static_cast<QData>(array_lsb)) start = array_lsb;
     if (end > addr_max) end = addr_max;
 
     VlWriteMem wmem(hex, bits, filename, start, end);
@@ -2206,6 +2225,9 @@ void VerilatedImp::commandArgVl(const std::string& arg) {
         else if (commandArgVlValue(arg, "+verilator+seed+", value/*ref*/)) {
             Verilated::randSeed(atoi(value.c_str()));
         }
+        else if (arg == "+verilator+noassert") {
+            Verilated::assertOn(false);
+        }
         else if (arg == "+verilator+V") {
             versionDump();  // Someday more info too
             VL_FATAL_MT("COMMAND_LINE", 0, "",
@@ -2403,9 +2425,9 @@ VerilatedVar* VerilatedScope::varFind(const char* namep) const VL_MT_SAFE_POSTIN
 
 void* VerilatedScope::exportFindNullError(int funcnum) VL_MT_SAFE {
     // Slowpath - Called only when find has failed
-    std::string msg = (std::string("Testbench C called '")
-                       +VerilatedImp::exportName(funcnum)
-                       +"' but scope wasn't set, perhaps due to dpi import call without 'context'");
+    std::string msg = (std::string("Testbench C called '") + VerilatedImp::exportName(funcnum)
+                       + "' but scope wasn't set, perhaps due to dpi import call without "
+                       + "'context', or missing svSetScope. See IEEE 1800-2017 35.5.3.");
     VL_FATAL_MT("unknown", 0, "", msg.c_str());
     return NULL;
 }

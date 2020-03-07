@@ -182,9 +182,7 @@ void V3Options::checkParameters() {
 }
 
 void V3Options::addCppFile(const string& filename) {
-    if (m_cppFiles.find(filename) == m_cppFiles.end()) {
-        m_cppFiles.insert(filename);
-    }
+    m_cppFiles.insert(filename);
 }
 void V3Options::addCFlags(const string& filename) {
     m_cFlags.push_back(filename);
@@ -193,9 +191,7 @@ void V3Options::addLdLibs(const string& filename) {
     m_ldLibs.push_back(filename);
 }
 void V3Options::addFuture(const string& flag) {
-    if (m_futures.find(flag) == m_futures.end()) {
-        m_futures.insert(flag);
-    }
+    m_futures.insert(flag);
 }
 bool V3Options::isFuture(const string& flag) const {
     return m_futures.find(flag) != m_futures.end();
@@ -204,25 +200,19 @@ bool V3Options::isLibraryFile(const string& filename) const {
     return m_libraryFiles.find(filename) != m_libraryFiles.end();
 }
 void V3Options::addLibraryFile(const string& filename) {
-    if (m_libraryFiles.find(filename) == m_libraryFiles.end()) {
-        m_libraryFiles.insert(filename);
-    }
+    m_libraryFiles.insert(filename);
 }
 bool V3Options::isClocker(const string& signame) const {
     return m_clockers.find(signame) != m_clockers.end();
 }
 void V3Options::addClocker(const string& signame) {
-    if (m_clockers.find(signame) == m_clockers.end()) {
-        m_clockers.insert(signame);
-    }
+    m_clockers.insert(signame);
 }
 bool V3Options::isNoClocker(const string& signame) const {
     return m_noClockers.find(signame) != m_noClockers.end();
 }
 void V3Options::addNoClocker(const string& signame) {
-    if (m_noClockers.find(signame) == m_noClockers.end()) {
-        m_noClockers.insert(signame);
-    }
+    m_noClockers.insert(signame);
 }
 void V3Options::addVFile(const string& filename) {
     // We use a list for v files, because it's legal to have includes
@@ -796,6 +786,7 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
             else if ( onoffb(sw, "-skip-identical", bflag/*ref*/))   { m_skipIdentical = bflag; }
             else if ( onoff (sw, "-stats", flag/*ref*/))             { m_stats = flag; }
             else if ( onoff (sw, "-stats-vars", flag/*ref*/))        { m_statsVars = flag; m_stats |= flag; }
+            else if ( onoff (sw, "-structs-unpacked", flag/*ref*/))  { m_structsPacked = flag; }
             else if (!strcmp(sw, "-sv"))                             { m_defaultLanguage = V3LangCode::L1800_2005; }
             else if ( onoff (sw, "-threads-coarsen", flag/*ref*/))   { m_threadsCoarsen = flag; }  // Undocumented, debug
             else if ( onoff (sw, "-trace", flag/*ref*/))             { m_trace = flag; }
@@ -1499,6 +1490,7 @@ V3Options::V3Options() {
     m_savable = false;
     m_stats = false;
     m_statsVars = false;
+    m_structsPacked = true;
     m_systemC = false;
     m_threads = 0;
     m_threadsDpiPure = true;

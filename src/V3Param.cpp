@@ -228,9 +228,9 @@ private:
         // Hitting a cell adds to the appropriate level of this level-sorted list,
         // so since cells originally exist top->bottom we process in top->bottom order too.
         while (!m_todoModps.empty()) {
-            LevelModMap::iterator it = m_todoModps.begin();
-            AstNodeModule* nodep = it->second;
-            m_todoModps.erase(it);
+            LevelModMap::iterator itm = m_todoModps.begin();
+            AstNodeModule* nodep = itm->second;
+            m_todoModps.erase(itm);
             if (!nodep->user5SetOnce()) {  // Process once; note clone() must clear so we do it again
                 m_modp = nodep;
                 UINFO(4," MOD   "<<nodep<<endl);
@@ -355,9 +355,16 @@ private:
                 if (VN_IS(backp, Var)
                     && VN_CAST(backp, Var)->isIfaceRef()
                     && VN_CAST(backp, Var)->childDTypep()
-                    && VN_CAST(VN_CAST(backp, Var)->childDTypep(), IfaceRefDType)) {
+                    && (VN_CAST(VN_CAST(backp, Var)->childDTypep(), IfaceRefDType)
+                        || (VN_CAST(VN_CAST(backp, Var)->childDTypep(), UnpackArrayDType)
+                            && VN_CAST(VN_CAST(backp, Var)->childDTypep()->getChildDTypep(),
+                                       IfaceRefDType)))) {
                     AstIfaceRefDType* ifacerefp
                         = VN_CAST(VN_CAST(backp, Var)->childDTypep(), IfaceRefDType);
+                    if (!ifacerefp) {
+                        ifacerefp = VN_CAST(VN_CAST(backp, Var)->childDTypep()->getChildDTypep(),
+                                            IfaceRefDType);
+                    }
                     // Interfaces passed in on the port map have ifaces
                     if (AstIface* ifacep = ifacerefp->ifacep()) {
                         if (dotted == backp->name()) {
@@ -424,20 +431,6 @@ private:
     }
 
     // Generate Statements
-    virtual void visit(AstGenerate* nodep) VL_OVERRIDE {
-        if (debug()>=9) nodep->dumpTree(cout, "-genin: ");
-        iterateChildren(nodep);
-        // After expanding the generate, all statements under it can be moved
-        // up, and the generate block deleted as it's not relevant
-        if (AstNode* stmtsp = nodep->stmtsp()) {
-            stmtsp->unlinkFrBackWithNext();
-            nodep->replaceWith(stmtsp);
-            if (debug()>=9) stmtsp->dumpTree(cout, "-genout: ");
-        } else {
-            nodep->unlinkFrBack();
-        }
-        VL_DO_DANGLING(nodep->deleteTree(), nodep);
-    }
     virtual void visit(AstGenIf* nodep) VL_OVERRIDE {
         UINFO(9,"  GENIF "<<nodep<<endl);
         iterateAndNextNull(nodep->condp());
