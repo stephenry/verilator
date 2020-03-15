@@ -288,7 +288,7 @@ string FileLine::asciiLineCol() const {
 }
 string FileLine::ascii() const {
     // For most errors especially in the parser the lastLineno is more accurate than firstLineno
-    return filename()+":"+cvtToStr(lastLineno());
+    return filename() + ":" + cvtToStr(lastLineno()) + ":" + cvtToStr(firstColumn());
 }
 std::ostream& operator<<(std::ostream& os, FileLine* fileline) {
     os <<fileline->ascii()<<": "<<std::hex;
@@ -376,8 +376,11 @@ string FileLine::warnOther() const {
 
 string FileLine::source() const {
     if (VL_UNCOVERABLE(!m_contentp)) {
-        if (debug() || v3Global.opt.debugCheck()) return "%Error-internal-no-contents";
-        else return "";
+        if (debug() || v3Global.opt.debugCheck()) {
+            return "%Error: internal tracking of file contents failed";
+        } else {
+            return "";
+        }
     }
     return m_contentp->getLine(m_contentLineno);
 }
