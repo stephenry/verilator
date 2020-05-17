@@ -242,7 +242,8 @@ public:  // But only for verilated*.cpp
         s_s.m_fdps.resize(31);
         std::fill(s_s.m_fdps.begin(), s_s.m_fdps.end(), (FILE*)0);
         s_s.m_fdFreeMct.resize(30);
-        std::iota(s_s.m_fdFreeMct.begin(), s_s.m_fdFreeMct.end(), 1);
+        for (int i = 0, id = 1; i < s_s.m_fdFreeMct.size(); i++, id++)
+            s_s.m_fdFreeMct[i] = id;
     }
     ~VerilatedImp() {}
 
